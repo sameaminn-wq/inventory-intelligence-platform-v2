@@ -62,7 +62,7 @@ For large sessions, the implementation may split work into bounded image batches
 - `normalizeResponse(raw)`: map vendor output to the canonical result.
 - `classifyError(error)`: map vendor failures to safe retry/fallback categories.
 
-The exact TypeScript interfaces and JSON Schema/Zod definitions are implementation work and must be added with contract tests. Do not treat this document as code.
+The first TypeScript provider interfaces and Gemini adapter are scaffolded in `apps/ai-service/src/ai`. The independent service currently exposes `POST /internal/v1/analyses`, protected by `AI_SERVICE_TOKEN`; `GET /health` is available for process health. The Core API integration, private object-storage references, persistent run records, formal JSON Schema/Zod contract tests and alternate provider adapters remain implementation work. Do not treat this document as proof of production readiness.
 
 ## Routing policy
 
