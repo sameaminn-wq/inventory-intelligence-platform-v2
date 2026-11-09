@@ -1,14 +1,30 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+function normalizePathname(pathname: string): string {
+  // Next.js trailingSlash=true can present /login/ to middleware. Compare
+  // canonical paths so the login page cannot redirect to itself forever.
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+}
+
+function isPathOrChild(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(base + '/');
+}
+
 export async function updateSession(request: NextRequest) {
+  const pathname = normalizePathname(request.nextUrl.pathname);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
   if (!url || !key) {
-    const pathname = request.nextUrl.pathname;
-    if (pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/api/')) {
+    if (
+      pathname === '/login' ||
+      isPathOrChild(pathname, '/auth') ||
+      isPathOrChild(pathname, '/api')
+    ) {
       return NextResponse.next({ request });
     }
+
     const destination = request.nextUrl.clone();
     destination.pathname = '/login';
     destination.search = '';
@@ -32,16 +48,16 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
-  const pathname = request.nextUrl.pathname;
-  const isLogin = pathname === '/login' || pathname.startsWith('/auth/');
-  const isApi = pathname.startsWith('/api/');
-  const isPublic = isLogin || isApi;
-  const isProtected = !isPublic;
+  const isLogin = pathname === '/login';
+  const isAuthRoute = isPathOrChild(pathname, '/auth');
+  const isApiRoute = isPathOrChild(pathname, '/api');
+  const isPublic = isLogin || isAuthRoute || isApiRoute;
 
   if (error || !claims) {
-    if (isProtected) {
+    if (!isPublic) {
       const destination = request.nextUrl.clone();
       destination.pathname = '/login';
+      destination.search = '';
       destination.searchParams.set('next', request.nextUrl.pathname);
       return NextResponse.redirect(destination);
     }
