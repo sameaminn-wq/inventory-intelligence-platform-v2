@@ -101,7 +101,7 @@ export default function AnalysisPage() {
         const dataBase64 = await compressForVercel(frame.dataUrl);
         totalBytes += Math.floor((dataBase64.length * 3) / 4);
         if (totalBytes > MAX_UPLOAD_BYTES) {
-          throw new Error('حجم الصور بعد الضغط ما زال أكبر من 3.5 ميجابايت. ابدأ جلسة بعدد صور أقل أو التقط صورًا أقل حجمًا.');
+          throw new Error('حجم الصور بعد الضغط ما زال أكبر من 2.8 ميجابايت. ابدأ جلسة بعدد صور أقل أو التقط صورًا أقل حجمًا.');
         }
         images.push({ imageId: frame.id, mimeType: 'image/jpeg', dataBase64 });
       }
