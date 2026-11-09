@@ -30,31 +30,58 @@ export class GeminiProvider implements AiProvider {
     if (!apiKey || !model) {
       throw new Error('Gemini provider is not configured; set GEMINI_API_KEY and GEMINI_MODEL');
     }
-    if (!input.captureSessionId || !Array.isArray(input.images) ||
+    if (!input || typeof input !== 'object' || Array.isArray(input) ||
+        typeof input.captureSessionId !== 'string' ||
+        input.captureSessionId.trim().length === 0 || input.captureSessionId.length > 128 ||
+        !Array.isArray(input.images) ||
         input.images.length === 0 || input.images.length > MAX_IMAGES_PER_REQUEST) {
-      throw new Error(`A shelf analysis requires 1-${MAX_IMAGES_PER_REQUEST} images`);
+      throw new Error(`A shelf analysis requires a session ID and 1-${MAX_IMAGES_PER_REQUEST} images`);
     }
 
-    const imageIds = input.images.map((image) => image.imageId);
-    if (imageIds.some((id) => !id) || new Set(imageIds).size !== imageIds.length) {
-      throw new Error('Each image must have a unique, non-empty imageId');
+    const imageIds = input.images.map((image) => image?.imageId);
+    if (imageIds.some((id) => typeof id !== 'string' || id.trim().length === 0 || id.length > 128) ||
+        new Set(imageIds).size !== imageIds.length) {
+      throw new Error('Each image must have a unique, non-empty imageId of at most 128 characters');
     }
 
     let totalBytes = 0;
     for (const image of input.images) {
+      if (!image || typeof image !== 'object') {
+        throw new Error('Each image must be an object');
+      }
       if (!this.getCapabilities().supportedMimeTypes.includes(image.mimeType)) {
         throw new Error(`Unsupported image MIME type: ${image.mimeType}`);
       }
-      if (typeof image.dataBase64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.dataBase64)) {
-        throw new Error('Image data must be valid base64');
+      if (typeof image.dataBase64 !== 'string' || image.dataBase64.length === 0 ||
+          image.dataBase64.length % 4 !== 0 ||
+          !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(image.dataBase64)) {
+        throw new Error('Image data must be canonical base64');
       }
-      totalBytes += Math.floor((image.dataBase64.length * 3) / 4);
+      const decoded = Buffer.from(image.dataBase64, 'base64');
+      if (decoded.length === 0 || decoded.toString('base64') !== image.dataBase64) {
+        throw new Error('Image data must be canonical base64');
+      }
+      totalBytes += decoded.length;
       if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
         throw new Error('Combined shelf images exceed the 20 MiB request limit');
       }
     }
 
-    const catalogHints = input.storeCatalogHints?.slice(0, 200) ?? [];
+    if (input.storeCatalogHints !== undefined &&
+        (!Array.isArray(input.storeCatalogHints) || input.storeCatalogHints.length > 200)) {
+      throw new Error('storeCatalogHints must contain at most 200 entries');
+    }
+    for (const hint of input.storeCatalogHints ?? []) {
+      if (!hint || typeof hint.productId !== 'string' || hint.productId.length === 0 ||
+          hint.productId.length > 128 || typeof hint.displayName !== 'string' ||
+          hint.displayName.trim().length === 0 || hint.displayName.length > 200 ||
+          (hint.brand !== undefined && (typeof hint.brand !== 'string' || hint.brand.length > 120)) ||
+          (hint.barcode !== undefined && (typeof hint.barcode !== 'string' || hint.barcode.length > 64))) {
+        throw new Error('A store catalog hint contains invalid fields');
+      }
+    }
+
+    const catalogHints = input.storeCatalogHints ?? [];
     const prompt = [
       'You are analyzing multiple photographs of ONE physical retail shelf from different angles.',
       'Treat all images as complementary views of the same shelf, not separate inventories.',
