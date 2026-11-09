@@ -9,8 +9,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function decodeCanonicalBase64(value: unknown): Buffer {
+  // Use a linear-time character check: nested quantified base64 regexes can
+  // overflow the regex engine stack on otherwise valid large image payloads.
   if (typeof value !== 'string' || value.length === 0 || value.length % 4 !== 0 ||
-      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(value) || /=/.test(value.slice(0, -2))) {
     throw new Error('Each image must contain canonical base64 data');
   }
   const decoded = Buffer.from(value, 'base64');
