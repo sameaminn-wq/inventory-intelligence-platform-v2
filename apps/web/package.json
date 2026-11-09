@@ -2,12 +2,22 @@
   "name": "@inventory/web",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build" },
+  "scripts": {
+    "dev": "next dev",
+    "test": "node --test test/*.test.cjs",
+    "build": "next build"
+  },
   "dependencies": {
-    "next": "15.5.6", "react": "19.1.1", "react-dom": "19.1.1"
+    "next": "15.5.29",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0"
   },
   "devDependencies": {
-    "@types/node": "22.15.30", "@types/react": "19.1.8",
-    "@types/react-dom": "19.1.7", "typescript": "5.8.3"
+    "@types/node": "22.15.30",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.7",
+    "typescript": "5.8.3"
   }
 }

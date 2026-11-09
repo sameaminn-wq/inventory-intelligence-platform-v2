@@ -2,11 +2,23 @@
   "name": "inventory-intelligence-platform",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/api", "apps/web"],
-  "engines": { "node": ">=22.0.0" },
+  "workspaces": [
+    "apps/api",
+    "apps/ai-service",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "build": "npm run build --workspace @inventory/api && npm run build --workspace @inventory/web",
+    "build": "npm run build --workspace @inventory/api && npm run build --workspace @inventory/ai-service && npm run build --workspace @inventory/web",
     "build:api": "npm run build --workspace @inventory/api",
-    "build:web": "npm run build --workspace @inventory/web"
+    "build:web": "npm run build --workspace @inventory/web",
+    "build:ai": "npm run build --workspace @inventory/ai-service"
+  },
+  "overrides": {
+    "postcss": "^8.5.32",
+    "path-to-regexp": "^8.4.2",
+    "multer": "^2.5.0"
   }
 }

@@ -1,51 +1,46 @@
-'use client';
+import { AppShell } from './components/app-shell';
 
-import { useState } from 'react';
-
-const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
+const stats = [
+  { label: 'المنتجات المسجلة', value: '—', note: 'بانتظار ربط كتالوج المتجر' },
+  { label: 'إجمالي وحدات المخزون', value: '—', note: 'لا توجد بيانات مخزون متصلة' },
+  { label: 'جلسات التصوير', value: '—', note: 'ستظهر بعد تفعيل واجهة الالتقاط' },
+  { label: 'مراجعات معلّقة', value: '—', note: 'لا توجد نتائج مراجعة محمّلة' },
+];
 
 export default function HomePage() {
-  const [health, setHealth] = useState<string>('Not checked');
-  const [checking, setChecking] = useState(false);
-
-  async function checkApi() {
-    setChecking(true);
-    setHealth('Checking…');
-    try {
-      if (!apiBase) throw new Error('API URL is not configured yet.');
-      const response = await fetch(apiBase + '/api/v1/health');
-      if (!response.ok) throw new Error('API returned HTTP ' + response.status);
-      const data = await response.json();
-      setHealth('Connected — ' + data.service + ' (' + data.status + ')');
-    } catch (error) {
-      setHealth(error instanceof Error ? error.message : 'Connection failed');
-    } finally {
-      setChecking(false);
-    }
-  }
-
   return (
-    <main style={{ maxWidth: 920, margin: '0 auto', padding: '72px 24px' }}>
-      <div style={{ color: '#2563eb', fontWeight: 700, letterSpacing: 2, fontSize: 12 }}>
-        INVENTORY INTELLIGENCE PLATFORM
-      </div>
-      <h1 style={{ color: '#111827', fontSize: 42, lineHeight: 1.1, margin: '18px 0' }}>
-        Know what is on your shelves.
-      </h1>
-      <p style={{ color: '#4b5563', fontSize: 18, maxWidth: 620, lineHeight: 1.6 }}>
-        A web shell connected to a dedicated API. Store accounts, inventory and image analysis
-        will be enabled in tested stages.
-      </p>
-      <section style={{ marginTop: 36, padding: 24, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
-        <h2 style={{ marginTop: 0, color: '#111827' }}>Deployment connection test</h2>
-        <p style={{ color: '#4b5563' }}>API status: <strong>{health}</strong></p>
-        <button onClick={checkApi} disabled={checking} style={{ background: '#1d4ed8', color: '#fff', border: 0, borderRadius: 8, padding: '12px 18px', cursor: 'pointer' }}>
-          {checking ? 'Checking…' : 'Check API connection'}
-        </button>
+    <AppShell title="نظرة عامة" description="تابع حالة المخزون وجلسات تصوير الأرفف ومراجعات التحليل من مكان واحد.">
+      <section className="stat-grid" aria-label="ملخص المتجر">
+        {stats.map((item) => (
+          <article className="stat-card" key={item.label}>
+            <span className="stat-label">{item.label}</span>
+            <strong className="stat-value">{item.value}</strong>
+            <small className="stat-note">{item.note}</small>
+          </article>
+        ))}
       </section>
-      <p style={{ marginTop: 32, color: '#6b7280', fontSize: 13 }}>
-        Development deployment only — do not use real customer data.
-      </p>
-    </main>
+      <div className="content-grid">
+        <section className="panel">
+          <h2>حالة العمل</h2>
+          <p className="panel-subtitle">ملخص اتصال الواجهة بمصادر بيانات المتجر.</p>
+          <div className="empty-state">
+            <div className="empty-icon" aria-hidden="true">⌁</div>
+            <h3>لم يتم ربط متجر بعد</h3>
+            <p>هذه الواجهة لا تعرض أرقامًا تجريبية على أنها بيانات حقيقية. ستظهر المنتجات والأرصدة بعد اكتمال المصادقة وربط API المتجر.</p>
+          </div>
+        </section>
+        <section className="panel">
+          <h2>اختصارات العمل</h2>
+          <p className="panel-subtitle">انتقل إلى المهمة المطلوبة.</p>
+          <div className="action-list">
+            <a className="action-row" href="/inventory/"><span>▤</span><div><strong>إدارة المخزون</strong><small>عرض المنتجات والأرصدة والحركات</small></div></a>
+            <a className="action-row" href="/capture/"><span>▣</span><div><strong>تصوير رف جديد</strong><small>التقاط صور الرف وفحص جودتها</small></div></a>
+            <a className="action-row" href="/review/"><span>✓</span><div><strong>مراجعة التحليل</strong><small>فحص اقتراحات الذكاء الاصطناعي</small></div></a>
+            <a className="action-row" href="/reports/"><span>▥</span><div><strong>التقارير والتصدير</strong><small>مراجعة التقارير وتجهيز التصدير</small></div></a>
+          </div>
+        </section>
+      </div>
+      <div className="notice">تنبيه: نسخة التطوير لا تحتوي بعد على بيانات متاجر حقيقية أو صلاحيات مستخدمين مفعّلة.</div>
+    </AppShell>
   );
 }

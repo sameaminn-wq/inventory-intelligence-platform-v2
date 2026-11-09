@@ -4,9 +4,24 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, 'bootstrap/**']
+    branches: [main, 'bootstrap/**', 'phase-1/**', 'architecture/**']
+
+permissions:
+  contents: read
 
 jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -14,5 +29,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npm run build
+      - name: Install dependencies
+        run: npm install
+      - name: Test smart capture guidance
+        run: npm run test --workspace @inventory/web
+      - name: Build all workspaces
+        run: npm run build
+      - name: Test Core API
+        run: npm run test --workspace @inventory/api
+      - name: Test AI service
+        run: npm run test --workspace @inventory/ai-service
