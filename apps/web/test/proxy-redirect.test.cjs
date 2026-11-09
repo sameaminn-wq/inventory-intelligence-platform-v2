@@ -14,7 +14,7 @@ test('normalizes trailing slashes before classifying routes', () => {
     .find((line) => line.includes('const pathname ='));
   assert.equal(
     normalizationLine?.trim(),
-    String.raw`const pathname = request.nextUrl.pathname.replace(/\/+$/, '') || '/';`,
+    String.raw\`const pathname = request.nextUrl.pathname.replace(/\/+$/, '') || '/';\`,
   );
 
   const normalizePathname = (pathname) => pathname.replace(/\/+$/, '') || '/';
