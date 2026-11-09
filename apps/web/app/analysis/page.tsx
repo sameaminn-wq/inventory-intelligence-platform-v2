@@ -83,11 +83,18 @@ export default function AnalysisPage() {
         const rawAnalysis = window.sessionStorage.getItem(ANALYSIS_KEY);
         if (rawAnalysis) {
           const parsed = JSON.parse(rawAnalysis) as Analysis;
-          setAnalysis(parsed);
-          setQuantities(Object.fromEntries(parsed.observations.map((item) => [
-            item.detectionId,
-            item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
-          ])));
+          const storeStillAuthorized = typeof parsed.storeId === 'string' &&
+            (storesPayload.stores as StoreOption[]).some((store) => store.id === parsed.storeId);
+          if (storeStillAuthorized) {
+            setAnalysis(parsed);
+            setSelectedStoreId(parsed.storeId);
+            setQuantities(Object.fromEntries(parsed.observations.map((item) => [
+              item.detectionId,
+              item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
+            ])));
+          } else {
+            window.sessionStorage.removeItem(ANALYSIS_KEY);
+          }
         }
       } catch (cause) {
         if (active) {
