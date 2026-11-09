@@ -51,8 +51,22 @@ export async function POST(request: NextRequest) {
   }
   if (!isRecord(input) || typeof input.captureSessionId !== 'string' ||
       input.captureSessionId.trim().length === 0 || input.captureSessionId.length > 128 ||
+      typeof input.storeId !== 'string' || input.storeId.trim().length === 0 || input.storeId.length > 128 ||
       !Array.isArray(input.images) || input.images.length < 1 || input.images.length > MAX_IMAGES) {
     return jsonError('جلسة التحليل غير مكتملة أو تحتوي على عدد صور غير صالح.', 400);
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('store_memberships')
+    .select('store_id, role')
+    .eq('store_id', input.storeId)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (membershipError) return jsonError('تعذر التحقق من صلاحيات المتجر.', 503);
+  if (!membership || !['owner', 'admin', 'manager', 'employee'].includes(membership.role)) {
+    return jsonError('ليس لديك صلاحية تحليل صور هذا المتجر.', 403);
   }
 
   const seen = new Set<string>();
