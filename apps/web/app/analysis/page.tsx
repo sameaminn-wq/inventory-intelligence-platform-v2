@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../components/app-shell';
+import { loadLatestCaptureSession } from '../../lib/capture-session-store';
 
 type Frame = { id: string; dataUrl: string; mimeType?: string };
 type Session = { captureSessionId: string; frames: Frame[] };
@@ -25,7 +26,6 @@ type Analysis = {
   note: string;
 };
 
-const SESSION_KEY = 'inventory.capture-session.v1';
 const ANALYSIS_KEY = 'inventory.analysis-result.v1';
 const MAX_UPLOAD_BYTES = 2.8 * 1024 * 1024;
 const MAX_REVIEW_QUANTITY = 100000;
@@ -57,21 +57,30 @@ export default function AnalysisPage() {
   const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    try {
-      const rawSession = window.sessionStorage.getItem(SESSION_KEY);
-      if (rawSession) setSession(JSON.parse(rawSession) as Session);
-      const rawAnalysis = window.sessionStorage.getItem(ANALYSIS_KEY);
-      if (rawAnalysis) {
-        const parsed = JSON.parse(rawAnalysis) as Analysis;
-        setAnalysis(parsed);
-        setQuantities(Object.fromEntries(parsed.observations.map((item) => [
-          item.detectionId,
-          item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
-        ])));
+    let active = true;
+    async function restoreLocalData() {
+      try {
+        const storedSession = await loadLatestCaptureSession();
+        if (!active) return;
+        if (storedSession) {
+          setSession(storedSession);
+          setPreviewImages(Object.fromEntries(storedSession.frames.map((frame) => [frame.id, frame.dataUrl])));
+        }
+        const rawAnalysis = window.sessionStorage.getItem(ANALYSIS_KEY);
+        if (rawAnalysis) {
+          const parsed = JSON.parse(rawAnalysis) as Analysis;
+          setAnalysis(parsed);
+          setQuantities(Object.fromEntries(parsed.observations.map((item) => [
+            item.detectionId,
+            item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
+          ])));
+        }
+      } catch {
+        if (active) setError('تعذر استعادة جلسة التصوير من التخزين المحلي. ارجع إلى صفحة التصوير وابدأ جلسة جديدة.');
       }
-    } catch {
-      setError('تعذر استعادة جلسة التصوير من ذاكرة المتصفح. ارجع إلى صفحة التصوير وابدأ جلسة جديدة.');
     }
+    void restoreLocalData();
+    return () => { active = false; };
   }, []);
 
   const imageCount = session?.frames.length ?? 0;
