@@ -2,10 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname.replace(/\\/+$/, '') || '/';
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) {
-    const pathname = request.nextUrl.pathname;
     if (pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/api/')) {
       return NextResponse.next({ request });
     }
@@ -32,7 +32,6 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
-  const pathname = request.nextUrl.pathname;
   const isLogin = pathname === '/login' || pathname.startsWith('/auth/');
   const isApi = pathname.startsWith('/api/');
   const isPublic = isLogin || isApi;
