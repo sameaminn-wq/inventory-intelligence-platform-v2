@@ -7,6 +7,9 @@ import { evaluateCaptureFrame } from '../../lib/capture-guidance.cjs';
 type Metrics = { blur: number; glare: number; clipped: number; brightness: number };
 type Guidance = { action: string; message: string; reasons: string[] };
 type CaptureMode = 'wide' | 'section' | 'alternate';
+const MAX_SESSION_IMAGES = 8;
+const MAX_SESSION_IMAGE_BYTES = 20 * 1024 * 1024;
+
 type CapturedFrame = {
   id: string;
   viewType: CaptureMode;
@@ -118,6 +121,10 @@ export default function CapturePage() {
   async function captureFrame() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || busy) return;
+    if (captured.length >= MAX_SESSION_IMAGES) {
+      setError(`وصلت إلى الحد الحالي وهو ${MAX_SESSION_IMAGES} صور للجلسة الواحدة. صدّر الجلسة أو ابدأ جلسة جديدة.`);
+      return;
+    }
     if (captureMode !== 'wide' && !captured.some((frame) => frame.viewType === 'wide')) {
       setError('ابدأ بصورة واسعة للرف قبل تصوير الأجزاء أو الزوايا الإضافية.');
       return;
@@ -153,11 +160,22 @@ export default function CapturePage() {
           setSessionId(activeSessionId);
           setSessionStartedAt(now.toISOString());
         }
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        const base64 = dataUrl.split(',')[1] ?? '';
+        const estimatedBytes = Math.floor((base64.length * 3) / 4);
+        const currentBytes = captured.reduce((total, item) => {
+          const encoded = item.dataUrl.split(',')[1] ?? '';
+          return total + Math.floor((encoded.length * 3) / 4);
+        }, 0);
+        if (currentBytes + estimatedBytes > MAX_SESSION_IMAGE_BYTES) {
+          setError('وصلت الصور إلى حد 20 ميجابايت للجلسة. صدّر الجلسة الحالية أو ابدأ جلسة جديدة قبل إضافة صور.');
+          return;
+        }
         const frame: CapturedFrame = {
           id: window.crypto?.randomUUID?.() ?? `frame-${now.getTime()}-${captured.length + 1}`,
           viewType: captureMode,
           capturedAt: now.toISOString(),
-          dataUrl: canvas.toDataURL('image/jpeg', 0.86),
+          dataUrl,
           metrics: measured,
           overlap: captureMode === 'wide' ? 'not_applicable' : overlap,
         };
@@ -295,7 +313,7 @@ export default function CapturePage() {
         </section>
       </div>
       <section className="panel captured-panel">
-        <div className="section-head"><div><h2>جلسة التصوير ({captured.length} صور)</h2><p className="panel-subtitle">{sessionId ? `معرّف الجلسة: ${sessionId}` : 'لم تبدأ جلسة بعد'}</p></div><div className="capture-session-actions"><button type="button" className="secondary-button" onClick={exportSession} disabled={!captured.length}>تصدير الصور وبيانات الجلسة</button><button type="button" className="text-button" onClick={startNewSession}>جلسة جديدة</button></div></div>
+        <div className="section-head"><div><h2>جلسة التصوير ({captured.length}/{MAX_SESSION_IMAGES} صور)</h2><p className="panel-subtitle">{sessionId ? `معرّف الجلسة: ${sessionId}` : 'لم تبدأ جلسة بعد'}</p></div><div className="capture-session-actions"><button type="button" className="secondary-button" onClick={exportSession} disabled={!captured.length}>تصدير الصور وبيانات الجلسة</button><button type="button" className="text-button" onClick={startNewSession}>جلسة جديدة</button></div></div>
         <p className="panel-subtitle">القبول فحص جودة أولي فقط. الصور محفوظة في ذاكرة الصفحة حتى التصدير أو بدء جلسة جديدة.</p>
         {captured.length === 0 ? <div className="empty-state"><h3>لم تلتقط صورًا بعد</h3><p>ابدأ بصورة واسعة للرف، ثم التقط الأجزاء المتجاورة.</p></div> : <div className="capture-thumbs">{captured.map((frame, index) => <figure key={frame.id}><img src={frame.dataUrl} alt={'صورة رف رقم ' + (index + 1)} /><figcaption>#{index + 1} · {frame.viewType === 'wide' ? 'واسعة' : frame.viewType === 'section' ? 'جزء رف' : 'زاوية إضافية'}{frame.overlap !== 'not_applicable' ? ` · التداخل: ${frame.overlap === 'low' ? 'قليل' : frame.overlap === 'high' ? 'كبير' : 'مناسب'}` : ''}</figcaption></figure>)}</div>}
         {captured.length > 0 && <div className="notice">الصور الواسعة: {captured.filter((frame) => frame.viewType === 'wide').length} · أجزاء الرف: {captured.filter((frame) => frame.viewType === 'section').length} · الزوايا الإضافية: {captured.filter((frame) => frame.viewType === 'alternate').length}. هذا سجل للصور الملتقطة فقط، وليس إثباتًا لاكتمال تغطية الرف.</div>}
