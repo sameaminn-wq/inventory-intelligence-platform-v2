@@ -1,0 +1,12 @@
+{
+  "name": "inventory-intelligence-platform",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/api", "apps/web"],
+  "engines": { "node": ">=22.0.0" },
+  "scripts": {
+    "build": "npm run build --workspace @inventory/api && npm run build --workspace @inventory/web",
+    "build:api": "npm run build --workspace @inventory/api",
+    "build:web": "npm run build --workspace @inventory/web"
+  }
+}

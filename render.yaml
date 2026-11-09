@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: inventory-intelligence-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build:api
+    startCommand: npm run start:prod --workspace @inventory/api
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
