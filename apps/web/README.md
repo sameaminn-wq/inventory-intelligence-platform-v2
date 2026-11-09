@@ -35,7 +35,7 @@ This integration is a development/preview slice, not production-ready:
 - There is not yet application user authentication, store membership authorization, capture-session ownership enforcement, or durable per-user rate limiting.
 - Keep the Vercel project on Preview deployments with Vercel Deployment Protection enabled while testing. Do not enable `ANALYSIS_API_ENABLED` on a publicly accessible deployment. Deployment Protection is an environment access gate, not application-level user/store authorization.
 - Before public/production access, implement authenticated user sessions, store membership checks, durable rate limits/quotas, and abuse monitoring. The API route protects the provider key but is not by itself an authorization boundary.
-- Analysis and human review drafts are stored in browser session storage only. They are not persisted to a database.
+- Capture photos are stored locally in IndexedDB; analysis results and human review drafts are stored in browser session storage. None of this data is persisted to a server database yet.
 - Saving a human review draft does not update inventory.
 - AI output is untrusted and requires human review. Unknown or occluded quantities must remain unknown.
 
