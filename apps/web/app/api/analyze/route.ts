@@ -5,6 +5,9 @@ export const maxDuration = 60;
 
 const MAX_IMAGES = 8;
 const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
+const MAX_OBSERVATIONS = 200;
+const MAX_WARNINGS = 50;
+const MAX_REVIEW_REASONS = 20;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -61,6 +64,10 @@ export async function POST(request: NextRequest) {
     images.push({ imageId: raw.imageId, mimeType: raw.mimeType, dataBase64: raw.dataBase64 });
   }
 
+  if (process.env.ANALYSIS_API_ENABLED !== 'true') {
+    return jsonError('مسار التحليل غير مفعّل لهذه البيئة بعد.', 503);
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL;
   if (!apiKey || !model) return jsonError('خدمة التحليل غير مهيأة بعد. أضف إعدادات مزود الذكاء الاصطناعي في Vercel.', 503);
@@ -108,7 +115,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [
             { text: prompt },
-            ...images.map((image) => ({ inline_data: { mime_type: image.mimeType, data: image.dataBase64 } })),
+            ...images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.dataBase64 } })),
           ] }],
           generationConfig: { responseMimeType: 'application/json' },
         }),
@@ -129,20 +136,53 @@ export async function POST(request: NextRequest) {
 
     if (!isRecord(result) || result.schemaVersion !== '1.0' ||
         result.captureSessionId !== input.captureSessionId ||
-        !Array.isArray(result.observations) || !Array.isArray(result.crossViewMatches) ||
-        !Array.isArray(result.unmatchedDetectionIds) || !Array.isArray(result.warnings) ||
-        typeof result.reviewRequired !== 'boolean') {
+        !Array.isArray(result.observations) || result.observations.length > MAX_OBSERVATIONS ||
+        !Array.isArray(result.crossViewMatches) || result.crossViewMatches.length > MAX_OBSERVATIONS ||
+        !Array.isArray(result.unmatchedDetectionIds) || result.unmatchedDetectionIds.length > MAX_OBSERVATIONS ||
+        !Array.isArray(result.warnings) || result.warnings.length > MAX_WARNINGS ||
+        typeof result.reviewRequired !== 'boolean' ||
+        result.warnings.some((warning) => typeof warning !== 'string' || warning.length > 500)) {
       return jsonError('نتيجة التحليل لا تطابق العقد المتوقع.', 502);
     }
     const validImageIds = new Set(images.map((image) => image.imageId));
+    const detectionIds = new Set<string>();
     for (const observation of result.observations) {
       if (!isRecord(observation) || typeof observation.detectionId !== 'string' ||
+          observation.detectionId.length === 0 || observation.detectionId.length > 128 ||
+          detectionIds.has(observation.detectionId) ||
           typeof observation.sourceImageId !== 'string' || !validImageIds.has(observation.sourceImageId) ||
+          !(observation.candidateProductName === null || (typeof observation.candidateProductName === 'string' && observation.candidateProductName.length <= 300)) ||
+          !(observation.brand === null || (typeof observation.brand === 'string' && observation.brand.length <= 200)) ||
+          !(observation.packageDescription === null || (typeof observation.packageDescription === 'string' && observation.packageDescription.length <= 500)) ||
           !(observation.estimatedVisibleQuantity === null ||
-            (Number.isInteger(observation.estimatedVisibleQuantity) && (observation.estimatedVisibleQuantity as number) >= 0)) ||
-          typeof observation.identityConfidence !== 'number' || observation.identityConfidence < 0 || observation.identityConfidence > 1) {
+            (Number.isInteger(observation.estimatedVisibleQuantity) && (observation.estimatedVisibleQuantity as number) >= 0 && (observation.estimatedVisibleQuantity as number) <= 100000)) ||
+          typeof observation.identityConfidence !== 'number' || !Number.isFinite(observation.identityConfidence) ||
+          observation.identityConfidence < 0 || observation.identityConfidence > 1 ||
+          !Array.isArray(observation.reviewReasons) || observation.reviewReasons.length > MAX_REVIEW_REASONS ||
+          observation.reviewReasons.some((reason) => typeof reason !== 'string' || reason.length > 300)) {
         return jsonError('تحتوي نتيجة التحليل على ملاحظة غير صالحة.', 502);
       }
+      detectionIds.add(observation.detectionId);
+      const box = observation.boundingBox;
+      if (!isRecord(box) || !['x', 'y', 'width', 'height'].every((key) =>
+        typeof box[key] === 'number' && Number.isFinite(box[key]) &&
+        (box[key] as number) >= 0 && (box[key] as number) <= 1)) {
+        return jsonError('تحتوي نتيجة التحليل على إطار تحديد غير صالح.', 502);
+      }
+    }
+    const matchedIds = new Set<string>();
+    for (const match of result.crossViewMatches) {
+      if (!isRecord(match) || typeof match.matchGroupId !== 'string' ||
+          typeof match.matchConfidence !== 'number' || !Number.isFinite(match.matchConfidence) ||
+          match.matchConfidence < 0 || match.matchConfidence > 1 ||
+          !Array.isArray(match.detectionIds) || match.detectionIds.length < 2 ||
+          match.detectionIds.some((id) => typeof id !== 'string' || !detectionIds.has(id) || matchedIds.has(id))) {
+        return jsonError('تحتوي نتيجة المطابقة بين الصور على مراجع غير صالحة.', 502);
+      }
+      for (const id of match.detectionIds as string[]) matchedIds.add(id);
+    }
+    if (result.unmatchedDetectionIds.some((id) => typeof id !== 'string' || !detectionIds.has(id) || matchedIds.has(id))) {
+      return jsonError('تحتوي نتيجة التحليل على معرفات منتجات غير متسقة.', 502);
     }
 
     return NextResponse.json({
