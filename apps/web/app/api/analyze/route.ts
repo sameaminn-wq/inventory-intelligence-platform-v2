@@ -220,8 +220,29 @@ export async function POST(request: NextRequest) {
       return jsonError('تحتوي نتيجة التحليل على معرفات منتجات غير متسقة.', 502);
     }
 
+    const { data: persistedSession, error: persistError } = await supabase
+      .from('analysis_sessions')
+      .insert({
+        store_id: input.storeId,
+        created_by: userId,
+        capture_session_id: input.captureSessionId,
+        provider: 'gemini',
+        model,
+        status: 'pending_review',
+        review_required: true,
+        result_json: result,
+      })
+      .select('id, created_at')
+      .single();
+    if (persistError || !persistedSession) {
+      console.error('Analysis persistence failed:', persistError?.code);
+      return jsonError('تم التحليل لكن تعذر حفظ النتيجة بشكل دائم. لم نعرضها كأنها محفوظة.', 503);
+    }
+
     return NextResponse.json({
       ...result,
+      analysisSessionId: persistedSession.id,
+      createdAt: persistedSession.created_at,
       storeId: input.storeId,
       provider: 'gemini',
       model,
