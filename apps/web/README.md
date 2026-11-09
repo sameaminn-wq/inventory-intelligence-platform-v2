@@ -37,9 +37,10 @@ This integration is a development/preview slice, not production-ready:
 
 - Supabase email/password authentication is integrated using `@supabase/ssr`; the Next.js 15 middleware refreshes cookie sessions, protects application pages, and the analysis API independently verifies the session.
 - User self-registration is disabled in the UI. Create employee accounts administratively in Supabase Auth.
-- Store membership authorization, capture-session ownership enforcement, and durable per-user/store rate limits are not implemented yet. A valid login alone must not be treated as permission to access a store.
+- Tenant foundation is now in the development database: `stores`, `store_memberships`, and `user_profiles`, all with RLS enabled. `/api/stores` returns active memberships only, and `/api/analyze` checks active membership plus an analysis-allowed role before using Gemini.
+- Store membership provisioning is administrator-only through Supabase Dashboard for now; there is no in-app invite or role-management screen yet.
 - Keep the Vercel project on Preview deployments with Vercel Deployment Protection enabled while testing. Do not enable `ANALYSIS_API_ENABLED` on a publicly accessible deployment. Deployment Protection is an environment access gate, not application-level user/store authorization.
-- Before public/production access, implement store membership checks, role-based permissions, capture-session ownership, durable rate limits/quotas, and abuse monitoring. The current login gate is identity verification, not tenant authorization.
+- Before public/production access, implement capture-session ownership, durable per-user/store rate limits and quotas, abuse monitoring, and an in-app audited membership administration workflow. The current tenant checks protect analysis by store membership, but they are not a complete production authorization system.
 - Capture photos are stored locally in IndexedDB; analysis results and human review drafts are stored in browser session storage. None of this data is persisted to a server database yet.
 - Saving a human review draft does not update inventory.
 - AI output is untrusted and requires human review. Unknown or occluded quantities must remain unknown.
@@ -48,9 +49,10 @@ This integration is a development/preview slice, not production-ready:
 
 1. Configure the Supabase Auth Site URL and allowed redirect URLs for the exact Vercel Preview domain.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Vercel Preview.
-3. Enable Vercel Preview Deployment Protection. Keep `ANALYSIS_API_ENABLED=false` until tenant membership and quotas are implemented.
-4. Deploy a Preview from `architecture/multi-provider-ai`.
-5. Sign in with an administrator-provisioned Supabase Auth account and confirm an unauthenticated browser is redirected to `/login`.
-6. Confirm sign-out clears the session and protected pages redirect back to `/login`.
-7. Keep the analysis API disabled; do not enable it before store authorization is ready.
-8. Confirm the provider key is not present in browser bundles or network responses.
+3. Provision Auth users, stores, and memberships using [the store provisioning guide](../../docs/STORE_MEMBERSHIP_BOOTSTRAP.md).
+4. Enable Vercel Preview Deployment Protection. Keep `ANALYSIS_API_ENABLED=false` until durable quotas and rate limits are implemented.
+5. Deploy a Preview from `architecture/multi-provider-ai`.
+6. Sign in with an administrator-provisioned Supabase Auth account and confirm an unauthenticated browser is redirected to `/login`.
+7. Confirm sign-out clears the session and protected pages redirect back to `/login`.
+8. Keep the analysis API disabled until durable quotas and rate limits are configured.
+9. Confirm the provider key is not present in browser bundles or network responses.
