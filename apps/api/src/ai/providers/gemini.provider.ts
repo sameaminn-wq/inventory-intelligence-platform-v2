@@ -35,6 +35,11 @@ export class GeminiProvider implements AiProvider {
       throw new Error(`A shelf analysis requires 1-${MAX_IMAGES_PER_REQUEST} images`);
     }
 
+    const imageIds = input.images.map((image) => image.imageId);
+    if (imageIds.some((id) => !id) || new Set(imageIds).size !== imageIds.length) {
+      throw new Error('Each image must have a unique, non-empty imageId');
+    }
+
     let totalBytes = 0;
     for (const image of input.images) {
       if (!this.getCapabilities().supportedMimeTypes.includes(image.mimeType)) {
@@ -43,7 +48,9 @@ export class GeminiProvider implements AiProvider {
       if (!/^[A-Za-z0-9+/]+={0,2}$/.test(image.dataBase64)) {
         throw new Error('Image data must be valid base64');
       }
-      totalBytes += Buffer.from(image.dataBase64, 'base64').byteLength;
+      const estimatedBytes = Math.floor((image.dataBase64.length * 3) / 4);
+      totalBytes += estimatedBytes;
+      if (totalBytes > MAX_TOTAL_IMAGE_BYTES) break;
     }
     if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
       throw new Error('Combined shelf images exceed the 20 MiB request limit');
