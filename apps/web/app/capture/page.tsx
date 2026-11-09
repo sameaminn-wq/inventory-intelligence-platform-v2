@@ -155,11 +155,6 @@ export default function CapturePage() {
       setAdvice(result);
       if (result.action === 'capture' || result.action === 'complete') {
         const now = new Date();
-        const activeSessionId = sessionId || (window.crypto?.randomUUID?.() ?? `capture-${now.getTime()}`);
-        if (!sessionId) {
-          setSessionId(activeSessionId);
-          setSessionStartedAt(now.toISOString());
-        }
         const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
         const base64 = dataUrl.split(',')[1] ?? '';
         const estimatedBytes = Math.floor((base64.length * 3) / 4);
@@ -170,6 +165,10 @@ export default function CapturePage() {
         if (currentBytes + estimatedBytes > MAX_SESSION_IMAGE_BYTES) {
           setError('وصلت الصور إلى حد 20 ميجابايت للجلسة. صدّر الجلسة الحالية أو ابدأ جلسة جديدة قبل إضافة صور.');
           return;
+        }
+        if (!sessionId) {
+          setSessionId(window.crypto?.randomUUID?.() ?? `capture-${now.getTime()}`);
+          setSessionStartedAt(now.toISOString());
         }
         const frame: CapturedFrame = {
           id: window.crypto?.randomUUID?.() ?? `frame-${now.getTime()}-${captured.length + 1}`,
