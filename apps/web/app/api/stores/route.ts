@@ -51,3 +51,41 @@ export async function GET() {
     })),
   });
 }
+
+
+export async function POST(request: Request) {
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return error('إعدادات المصادقة غير مكتملة على الخادم.', 503);
+  }
+  const { data: authData, error: authError } = await supabase.auth.getClaims();
+  const userId = authData?.claims?.sub;
+  if (authError || typeof userId !== 'string' || userId.length === 0) {
+    return error('يجب تسجيل الدخول أولًا.', 401);
+  }
+
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { return error('صيغة الطلب غير صالحة.', 400); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return error('بيانات المتجر غير صالحة.', 400);
+  }
+  const input = body as Record<string, unknown>;
+  if (typeof input.name !== 'string' || typeof input.slug !== 'string' ||
+      input.name.length > 160 || input.slug.length > 80) {
+    return error('اسم المتجر أو رابطه غير صالح.', 400);
+  }
+
+  const { data: storeId, error: createError } = await supabase.rpc('create_store_for_current_user', {
+    p_name: input.name, p_slug: input.slug,
+  });
+  if (createError) {
+    if (createError.code === '23505') return error('رابط المتجر مستخدم بالفعل.', 409);
+    if (createError.code === '22023') return error(createError.message, 400);
+    console.error('Store creation failed:', createError.code);
+    return error('تعذر إنشاء المتجر حالياً.', 500);
+  }
+  return NextResponse.json({ storeId }, { status: 201 });
+}
