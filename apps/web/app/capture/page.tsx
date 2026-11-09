@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AppShell } from '../components/app-shell';
+import { evaluateCaptureFrame } from '../../lib/capture-guidance.cjs';
 
-type Metrics = { blur: number; glare: number; brightness: number };
+type Metrics = { blur: number; glare: number; clipped: number; brightness: number };
 type Guidance = { action: string; message: string; reasons: string[] };
 
 function measureFrame(canvas: HTMLCanvasElement): Metrics {
@@ -11,7 +12,7 @@ function measureFrame(canvas: HTMLCanvasElement): Metrics {
   if (!context) throw new Error('تعذر فحص إطار الكاميرا.');
   const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
   const sample = Math.max(1, Math.floor(Math.sqrt((width * height) / 12000)));
-  let brightness = 0, glare = 0, count = 0;
+  let brightness = 0, glare = 0, clipped = 0, count = 0;
   const gray: number[] = [];
   for (let y = 0; y < height; y += sample) {
     for (let x = 0; x < width; x += sample) {
@@ -20,6 +21,7 @@ function measureFrame(canvas: HTMLCanvasElement): Metrics {
       gray.push(value);
       brightness += value / 255;
       if (value >= 248) glare++;
+      if (value <= 5 || value >= 250) clipped++;
       count++;
     }
   }
@@ -38,16 +40,11 @@ function measureFrame(canvas: HTMLCanvasElement): Metrics {
   return {
     blur: Math.max(0, Math.min(1, variance / 1800)),
     glare: count ? glare / count : 0,
+    clipped: count ? clipped / count : 0,
     brightness: count ? brightness / count : 0,
   };
 }
 
-function guidance(metrics: Metrics): Guidance {
-  if (metrics.blur < 0.12) return { action: 'retake', message: 'الصورة غير واضحة. ثبّت الهاتف وانتظر حتى يثبت التركيز ثم أعد الالتقاط.', reasons: ['BLUR_SUSPECTED'] };
-  if (metrics.glare > 0.22) return { action: 'retake', message: 'يوجد لمعان قوي. غيّر زاوية الهاتف أو ابتعد عن مصدر الضوء المباشر.', reasons: ['GLARE_SUSPECTED'] };
-  if (metrics.brightness < 0.16 || metrics.brightness > 0.91) return { action: 'retake', message: 'الإضاءة غير مناسبة. حسّن الإضاءة دون توجيه ضوء مباشر إلى العبوات.', reasons: ['EXPOSURE_OUT_OF_RANGE'] };
-  return { action: 'accepted_for_review', message: 'جودة الصورة الأولية مناسبة. هذا لا يؤكد اكتمال الرف أو دقة عدّ المنتجات.', reasons: [] };
-}
 
 export default function CapturePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -118,10 +115,20 @@ export default function CapturePage() {
       if (!context) throw new Error('تعذر تجهيز الصورة.');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const measured = measureFrame(canvas);
-      const result = guidance(measured);
+      const decision = evaluateCaptureFrame({
+        blurScore: measured.blur,
+        glareRatio: measured.glare,
+        clippedPixelRatio: measured.clipped,
+        motionScore: motionScore ?? undefined,
+      }, { blurMinimum: 0.12, glareMaximum: 0.22, clippedPixelMaximum: 0.25 });
+      const result: Guidance = {
+        action: decision.action,
+        message: decision.message,
+        reasons: [...decision.reasons],
+      };
       setMetrics(measured);
       setAdvice(result);
-      if (result.action === 'accepted_for_review') {
+      if (result.action === 'capture' || result.action === 'complete') {
         setCaptured((items) => [...items, canvas.toDataURL('image/jpeg', 0.86)]);
       }
     } catch (cause) {
@@ -190,8 +197,8 @@ export default function CapturePage() {
             <button className="text-button" onClick={stopCamera}>إيقاف</button>
           </div>
           {error && <p className="error-message" role="alert">{error}</p>}
-          {advice && <div className={advice.action === 'accepted_for_review' ? 'capture-feedback good' : 'capture-feedback warning'} role="status"><strong>{advice.action === 'accepted_for_review' ? 'الصورة مقبولة مبدئيًا' : 'نحتاج صورة أفضل'}</strong><p>{advice.message}</p></div>}
-          {metrics && <div className="metric-list"><span>مؤشر الوضوح: <b>{(metrics.blur * 100).toFixed(0)} / 100</b></span><span>نسبة اللمعان: <b>{(metrics.glare * 100).toFixed(1)}%</b></span><span>متوسط الإضاءة: <b>{(metrics.brightness * 100).toFixed(1)}%</b></span></div>}
+          {advice && <div className={advice.action === 'capture' || advice.action === 'complete' ? 'capture-feedback good' : 'capture-feedback warning'} role="status"><strong>{advice.action === 'capture' || advice.action === 'complete' ? 'الصورة مقبولة مبدئيًا' : 'اتبع إرشادات التصوير'}</strong><p>{advice.message}</p></div>}
+          {metrics && <div className="metric-list"><span>مؤشر الوضوح: <b>{(metrics.blur * 100).toFixed(0)} / 100</b></span><span>نسبة اللمعان: <b>{(metrics.glare * 100).toFixed(1)}%</b></span><span>البكسلات شديدة السطوع/الظلام: <b>{(metrics.clipped * 100).toFixed(1)}%</b></span><span>متوسط الإضاءة: <b>{(metrics.brightness * 100).toFixed(1)}%</b></span></div>}
         </section>
         <section className="panel">
           <h2>إرشادات الموظف</h2><p className="panel-subtitle">اتبع هذه الخطوات لتقليل التكرار والمناطق غير المصورة.</p>
