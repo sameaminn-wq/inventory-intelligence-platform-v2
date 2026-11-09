@@ -8,6 +8,7 @@ const navigation = [
   { href: '/', label: 'الرئيسية', icon: '⌂' },
   { href: '/inventory/', label: 'المخزون', icon: '▤' },
   { href: '/capture/', label: 'تصوير الرفوف', icon: '▣' },
+  { href: '/analysis/', label: 'تحليل الرف', icon: '⌁' },
   { href: '/review/', label: 'مراجعة التحليل', icon: '✓' },
   { href: '/reports/', label: 'التقارير والتصدير', icon: '▥' },
 ];
