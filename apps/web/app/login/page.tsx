@@ -1,12 +1,11 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,7 +20,7 @@ export default function LoginPage() {
       const supabase = createClient();
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
-      const requested = searchParams.get('next') || '/';
+      const requested = new URLSearchParams(window.location.search).get('next') || '/';
       const safePath = requested.startsWith('/') && !requested.startsWith('//') ? requested : '/';
       router.replace(safePath);
       router.refresh();
