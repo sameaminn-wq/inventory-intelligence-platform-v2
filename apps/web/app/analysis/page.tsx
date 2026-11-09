@@ -19,6 +19,7 @@ type Observation = {
 };
 type Analysis = {
   captureSessionId: string;
+  storeId: string;
   provider: string;
   model: string;
   observations: Observation[];
@@ -159,7 +160,7 @@ export default function AnalysisPage() {
     const review = {
       schemaVersion: 'human-review-local-1.0',
       captureSessionId: analysis.captureSessionId,
-      storeId: selectedStoreId,
+      storeId: analysis.storeId,
       reviewedAt: new Date().toISOString(),
       inventoryUpdated: false,
       observations: analysis.observations.map((item) => ({
@@ -187,7 +188,12 @@ export default function AnalysisPage() {
         {!storesLoading && stores.length === 0 && <div className="notice">حسابك لا يرتبط حاليًا بأي متجر نشط. اطلب من مدير النظام إضافتك إلى متجر قبل إجراء التحليل.</div>}
         {stores.length > 0 && <div className="store-picker">
           <label htmlFor="analysis-store">المتجر الذي تنتمي إليه الصور</label>
-          <select id="analysis-store" value={selectedStoreId} onChange={(event) => setSelectedStoreId(event.target.value)}>
+          <select id="analysis-store" value={selectedStoreId} onChange={(event) => {
+            setSelectedStoreId(event.target.value);
+            setAnalysis(null);
+            setSaved(false);
+            window.sessionStorage.removeItem(ANALYSIS_KEY);
+          }}>
             <option value="">اختر متجرًا</option>
             {stores.map((store) => <option key={store.id} value={store.id}>{store.name} — {store.role}</option>)}
           </select>
