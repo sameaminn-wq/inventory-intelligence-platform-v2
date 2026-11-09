@@ -165,3 +165,16 @@ button:focus-visible, a:focus-visible { outline:3px solid #80b99a; outline-offse
   border-radius: 12px;
   background: #f5f7fa;
 }
+
+
+.auth-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--page-bg,#f4f6fa)}
+.auth-card{width:min(100%,440px);padding:32px;border:1px solid var(--border,#e0e5ed);border-radius:20px;background:var(--surface,#fff);box-shadow:0 16px 48px rgba(20,35,60,.08)}
+.auth-brand{font-weight:800;letter-spacing:.02em;color:var(--primary,#2563eb);margin-bottom:18px}
+.auth-card h1{margin:0 0 8px}.auth-card>p{color:var(--muted,#64748b);line-height:1.7}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:24px 0}
+.auth-tabs button{padding:10px;border:1px solid var(--border,#e0e5ed);border-radius:10px;background:transparent;cursor:pointer}
+.auth-tabs button.active{background:var(--primary-soft,#eff6ff);border-color:var(--primary,#2563eb);color:var(--primary,#2563eb);font-weight:700}
+.auth-card form{display:grid;gap:10px}.auth-card form label{font-weight:650;margin-top:8px}
+.auth-card form input{width:100%;padding:12px;border:1px solid var(--border,#cbd5e1);border-radius:10px;background:transparent;color:inherit}
+.auth-card form .primary-button{margin-top:16px;width:100%;justify-content:center}
+.auth-footnote{font-size:.85rem;border-top:1px solid var(--border,#e0e5ed);padding-top:14px}
