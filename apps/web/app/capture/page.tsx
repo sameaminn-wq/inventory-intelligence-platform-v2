@@ -57,10 +57,16 @@ export default function CapturePage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [advice, setAdvice] = useState<Guidance | null>(null);
   const [motion, setMotion] = useState('غير متاح');
+  const [motionScore, setMotionScore] = useState<number | null>(null);
+  const lastAccelerationRef = useRef<{ x: number; y: number; z: number } | null>(null);
+  const motionHandlerRef = useRef<((event: DeviceMotionEvent) => void) | null>(null);
   const [captured, setCaptured] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    if (motionHandlerRef.current) window.removeEventListener('devicemotion', motionHandlerRef.current);
+  }, []);
 
   async function startCamera() {
     setError('');
@@ -89,6 +95,13 @@ export default function CapturePage() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    if (motionHandlerRef.current) {
+      window.removeEventListener('devicemotion', motionHandlerRef.current);
+      motionHandlerRef.current = null;
+    }
+    lastAccelerationRef.current = null;
+    setMotionScore(null);
+    setMotion('تم إيقاف قراءة الحركة');
     setCameraState('تم إيقاف الكاميرا');
   }
 
@@ -120,18 +133,45 @@ export default function CapturePage() {
 
   function observeMotion() {
     if (!('DeviceMotionEvent' in window)) {
-      setMotion('المستشعر غير مدعوم؛ سنعتمد على تحليل الصورة.');
+      setMotion('المستشعر غير مدعوم؛ سنعتمد على فحص الصورة.');
       return;
     }
+
     const DeviceMotion = DeviceMotionEvent as typeof DeviceMotionEvent & {
       requestPermission?: () => Promise<'granted' | 'denied'>;
     };
+
+    const startListening = () => {
+      if (motionHandlerRef.current) window.removeEventListener('devicemotion', motionHandlerRef.current);
+      lastAccelerationRef.current = null;
+      const handleMotion = (event: DeviceMotionEvent) => {
+        const acceleration = event.accelerationIncludingGravity;
+        if (!acceleration || acceleration.x == null || acceleration.y == null || acceleration.z == null) {
+          setMotion('بيانات الحركة غير متاحة حاليًا؛ فحص الصورة ما زال يعمل.');
+          return;
+        }
+        const current = { x: acceleration.x, y: acceleration.y, z: acceleration.z };
+        const previous = lastAccelerationRef.current;
+        lastAccelerationRef.current = current;
+        if (!previous) return;
+        const delta = Math.hypot(current.x - previous.x, current.y - previous.y, current.z - previous.z);
+        // Device-independent advisory score; image sharpness remains the capture authority.
+        const score = Math.max(0, Math.min(1, delta / 5));
+        setMotionScore(score);
+        setMotion(score > 0.55 ? 'حركة ملحوظة؛ توقف لحظة قبل الالتقاط.' : score > 0.25 ? 'تحرك ببطء وحافظ على ثبات الهاتف.' : 'الحركة منخفضة؛ يمكنك متابعة التصوير.');
+      };
+      motionHandlerRef.current = handleMotion;
+      window.addEventListener('devicemotion', handleMotion);
+      setMotion('جارٍ قياس حركة الهاتف؛ انتظر لحظات لقراءة المؤشر.');
+    };
+
     if (typeof DeviceMotion.requestPermission === 'function') {
       void DeviceMotion.requestPermission().then((permission) => {
-        setMotion(permission === 'granted' ? 'تم السماح بقراءة الحركة' : 'لم يُسمح بمستشعر الحركة');
-      }).catch(() => setMotion('تعذر قراءة مستشعر الحركة'));
+        if (permission === 'granted') startListening();
+        else setMotion('لم يُسمح بمستشعر الحركة؛ سنعتمد على فحص الصورة.');
+      }).catch(() => setMotion('تعذر قراءة مستشعر الحركة؛ فحص الصورة ما زال متاحًا.'));
     } else {
-      setMotion('المتصفح يدعم مستشعر الحركة عند توفر البيانات');
+      startListening();
     }
   }
 
@@ -162,7 +202,7 @@ export default function CapturePage() {
             <li>توقف لحظة قبل كل التقاط، وتجنب الحركة السريعة.</li>
             <li>صوّر من زاوية إضافية إذا كانت المنتجات محجوبة.</li>
           </ol>
-          <div className="notice">حالة مستشعر الحركة: {motion}. <button className="inline-link" onClick={observeMotion}>فحص الإتاحة</button></div>
+          <div className="notice">حالة حركة الموظف: {motion} <button className="inline-link" onClick={observeMotion}>تشغيل قياس الحركة</button>{motionScore !== null && <strong className="motion-meter">مؤشر الحركة اللحظي: {(motionScore * 100).toFixed(0)}%</strong>}</div>
           <div className="notice">الصور المقبولة محفوظة مؤقتًا في ذاكرة الصفحة فقط. لا يوجد رفع أو حفظ دائم أو اتصال بالخادم في هذه المرحلة.</div>
         </section>
       </div>
