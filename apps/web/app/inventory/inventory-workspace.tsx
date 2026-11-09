@@ -69,12 +69,12 @@ export function InventoryWorkspace({ stores, initialStoreId }: { stores: Store[]
     event.preventDefault();
     if (movementBusy || !storeId || !productId) return;
     const amount = Number(quantity);
-    if (!Number.isFinite(amount) || amount <= 0) { setError('أدخل كمية أكبر من صفر.'); return; }
+    if (!Number.isFinite(amount) || (movementType === 'adjustment' ? amount === 0 : amount <= 0)) { setError(movementType === 'adjustment' ? 'أدخل قيمة تسوية موجبة أو سالبة، لا تساوي صفراً.' : 'أدخل كمية أكبر من صفر.'); return; }
     setMovementBusy(true); setError(''); setNotice('');
     try {
       const response = await fetch('/api/inventory/movements', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ storeId, productId, type: movementType, quantity: amount, notes }),
+        body: JSON.stringify({ storeId, productId, type: movementType, quantity: movementType === 'outbound' ? Math.abs(amount) : amount, notes }),
       });
       const result = await response.json() as { error?: string; quantityAfter?: number };
       if (!response.ok) throw new Error(result.error || 'تعذر تسجيل الحركة.');
@@ -115,7 +115,7 @@ export function InventoryWorkspace({ stores, initialStoreId }: { stores: Store[]
       <form className="team-form" onSubmit={addMovement}>
         <label>المنتج<select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">اختر منتجاً</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <label>نوع الحركة<select value={movementType} onChange={e=>setMovementType(e.target.value as typeof movementType)}><option value="inbound">إضافة للمخزون</option><option value="outbound">صرف من المخزون</option><option value="adjustment">تسوية (زيادة أو نقص)</option></select></label>
-        <label>الكمية<input type="number" min="0.001" step="0.001" required value={quantity} onChange={e=>setQuantity(e.target.value)} placeholder="0" /></label>
+        <label>الكمية<input type="number" min={movementType === 'adjustment' ? undefined : '0.001'} step="0.001" required value={quantity} onChange={e=>setQuantity(e.target.value)} placeholder="0" /></label>
         <label>ملاحظات (اختياري)<input maxLength={500} value={notes} onChange={e=>setNotes(e.target.value)} /></label>
         <button className="primary-button" type="submit" disabled={movementBusy || !products.length}>{movementBusy?'جارٍ التسجيل…':'تسجيل الحركة'}</button>
       </form>
