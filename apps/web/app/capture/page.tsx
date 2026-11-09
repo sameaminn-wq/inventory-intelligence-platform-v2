@@ -6,6 +6,15 @@ import { evaluateCaptureFrame } from '../../lib/capture-guidance.cjs';
 
 type Metrics = { blur: number; glare: number; clipped: number; brightness: number };
 type Guidance = { action: string; message: string; reasons: string[] };
+type CaptureMode = 'wide' | 'section' | 'alternate';
+type CapturedFrame = {
+  id: string;
+  viewType: CaptureMode;
+  capturedAt: string;
+  dataUrl: string;
+  metrics: Metrics;
+  overlap: 'not_applicable' | 'low' | 'adequate' | 'high';
+};
 
 function measureFrame(canvas: HTMLCanvasElement): Metrics {
   const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -57,7 +66,11 @@ export default function CapturePage() {
   const [motionScore, setMotionScore] = useState<number | null>(null);
   const lastAccelerationRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const motionHandlerRef = useRef<((event: DeviceMotionEvent) => void) | null>(null);
-  const [captured, setCaptured] = useState<string[]>([]);
+  const [captured, setCaptured] = useState<CapturedFrame[]>([]);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>('wide');
+  const [overlap, setOverlap] = useState<'low' | 'adequate' | 'high'>('adequate');
+  const [sessionId, setSessionId] = useState('');
+  const [sessionStartedAt, setSessionStartedAt] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => () => {
@@ -105,6 +118,11 @@ export default function CapturePage() {
   async function captureFrame() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || busy) return;
+    if (captureMode !== 'wide' && !captured.some((frame) => frame.viewType === 'wide')) {
+      setError('ابدأ بصورة واسعة للرف قبل تصوير الأجزاء أو الزوايا الإضافية.');
+      return;
+    }
+    setError('');
     setBusy(true);
     try {
       const canvas = document.createElement('canvas');
@@ -129,13 +147,60 @@ export default function CapturePage() {
       setMetrics(measured);
       setAdvice(result);
       if (result.action === 'capture' || result.action === 'complete') {
-        setCaptured((items) => [...items, canvas.toDataURL('image/jpeg', 0.86)]);
+        const now = new Date();
+        const activeSessionId = sessionId || (window.crypto?.randomUUID?.() ?? `capture-${now.getTime()}`);
+        if (!sessionId) {
+          setSessionId(activeSessionId);
+          setSessionStartedAt(now.toISOString());
+        }
+        const frame: CapturedFrame = {
+          id: window.crypto?.randomUUID?.() ?? `frame-${now.getTime()}-${captured.length + 1}`,
+          viewType: captureMode,
+          capturedAt: now.toISOString(),
+          dataUrl: canvas.toDataURL('image/jpeg', 0.86),
+          metrics: measured,
+          overlap: captureMode === 'wide' ? 'not_applicable' : overlap,
+        };
+        setCaptured((items) => [...items, frame]);
+        if (captureMode === 'wide') setCaptureMode('section');
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'فشل فحص الصورة.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function startNewSession() {
+    if (streamRef.current) stopCamera();
+    setCaptured([]);
+    setSessionId('');
+    setSessionStartedAt('');
+    setCaptureMode('wide');
+    setOverlap('adequate');
+    setMetrics(null);
+    setAdvice(null);
+    setError('');
+  }
+
+  function exportSession() {
+    if (!captured.length || !sessionId) return;
+    const manifest = {
+      schemaVersion: 'capture-session-local-1.0',
+      captureSessionId: sessionId,
+      startedAt: sessionStartedAt,
+      exportedAt: new Date().toISOString(),
+      storage: 'browser-memory-export',
+      note: 'Local capture package only. No AI analysis, product count, or server persistence is included.',
+      frames: captured.map(({ dataUrl, ...metadata }) => ({ ...metadata, imageDataUrl: dataUrl })),
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `shelf-capture-${sessionId}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   function observeMotion() {
@@ -202,6 +267,22 @@ export default function CapturePage() {
         </section>
         <section className="panel">
           <h2>إرشادات الموظف</h2><p className="panel-subtitle">اتبع هذه الخطوات لتقليل التكرار والمناطق غير المصورة.</p>
+          <div className="capture-mode-panel">
+            <strong>نوع الصورة التالية</strong>
+            <div className="capture-mode-actions">
+              <button type="button" className={captureMode === 'wide' ? 'mode-button selected' : 'mode-button'} onClick={() => setCaptureMode('wide')}>صورة واسعة</button>
+              <button type="button" className={captureMode === 'section' ? 'mode-button selected' : 'mode-button'} onClick={() => setCaptureMode('section')} disabled={!captured.some((frame) => frame.viewType === 'wide')}>جزء من الرف</button>
+              <button type="button" className={captureMode === 'alternate' ? 'mode-button selected' : 'mode-button'} onClick={() => setCaptureMode('alternate')} disabled={!captured.some((frame) => frame.viewType === 'wide')}>زاوية إضافية</button>
+            </div>
+            {captureMode !== 'wide' && <label className="overlap-control">التداخل مع الصورة السابقة
+              <select value={overlap} onChange={(event) => setOverlap(event.target.value as 'low' | 'adequate' | 'high')}>
+                <option value="low">قليل — أقل من المطلوب</option>
+                <option value="adequate">مناسب — نحو 20 إلى 40%</option>
+                <option value="high">كبير — أكثر من نصف المنطقة</option>
+              </select>
+            </label>}
+            <p className="panel-subtitle">ابدأ بصورة واسعة، ثم انتقل بين أجزاء الرف مع تداخل بصري. اختيار التداخل هنا إقرار من الموظف وليس قياسًا آليًا.</p>
+          </div>
           <ol className="capture-steps">
             <li>ابدأ بصورة واسعة للرف كاملًا.</li>
             <li>اقترب وصوّر كل جزء بوضوح.</li>
@@ -213,7 +294,12 @@ export default function CapturePage() {
           <div className="notice">الصور المقبولة محفوظة مؤقتًا في ذاكرة الصفحة فقط. لا يوجد رفع أو حفظ دائم أو اتصال بالخادم في هذه المرحلة.</div>
         </section>
       </div>
-      <section className="panel captured-panel"><h2>الصور المقبولة مبدئيًا ({captured.length})</h2><p className="panel-subtitle">القبول هنا فحص جودة أولي فقط، وليس اعتمادًا لصحة تحليل المنتجات.</p>{captured.length === 0 ? <div className="empty-state"><h3>لم تلتقط صورًا بعد</h3><p>شغّل الكاميرا والتقط صورة لتظهر هنا.</p></div> : <div className="capture-thumbs">{captured.map((src, index) => <figure key={index}><img src={src} alt={'صورة رف رقم ' + (index + 1)} /><figcaption>الصورة {index + 1}</figcaption></figure>)}</div>}</section>
+      <section className="panel captured-panel">
+        <div className="section-head"><div><h2>جلسة التصوير ({captured.length} صور)</h2><p className="panel-subtitle">{sessionId ? `معرّف الجلسة: ${sessionId}` : 'لم تبدأ جلسة بعد'}</p></div><div className="capture-session-actions"><button type="button" className="secondary-button" onClick={exportSession} disabled={!captured.length}>تصدير الصور وبيانات الجلسة</button><button type="button" className="text-button" onClick={startNewSession}>جلسة جديدة</button></div></div>
+        <p className="panel-subtitle">القبول فحص جودة أولي فقط. الصور محفوظة في ذاكرة الصفحة حتى التصدير أو بدء جلسة جديدة.</p>
+        {captured.length === 0 ? <div className="empty-state"><h3>لم تلتقط صورًا بعد</h3><p>ابدأ بصورة واسعة للرف، ثم التقط الأجزاء المتجاورة.</p></div> : <div className="capture-thumbs">{captured.map((frame, index) => <figure key={frame.id}><img src={frame.dataUrl} alt={'صورة رف رقم ' + (index + 1)} /><figcaption>#{index + 1} · {frame.viewType === 'wide' ? 'واسعة' : frame.viewType === 'section' ? 'جزء رف' : 'زاوية إضافية'}{frame.overlap !== 'not_applicable' ? ` · التداخل: ${frame.overlap === 'low' ? 'قليل' : frame.overlap === 'high' ? 'كبير' : 'مناسب'}` : ''}</figcaption></figure>)}</div>}
+        {captured.length > 0 && <div className="notice">الصور الواسعة: {captured.filter((frame) => frame.viewType === 'wide').length} · أجزاء الرف: {captured.filter((frame) => frame.viewType === 'section').length} · الزوايا الإضافية: {captured.filter((frame) => frame.viewType === 'alternate').length}. هذا سجل للصور الملتقطة فقط، وليس إثباتًا لاكتمال تغطية الرف.</div>}
+      </section>
     </AppShell>
   );
 }
