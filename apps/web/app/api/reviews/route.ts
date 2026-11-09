@@ -23,13 +23,27 @@ export async function GET(request: NextRequest) {
     .eq('store_id', storeId).order('created_at', { ascending: false }).limit(50);
   if (error) return fail('تعذر تحميل جلسات التحليل المحفوظة.', 503);
 
-  const ids = (data ?? []).map(row => row.id);
+  const sessions = data ?? [];
+  const sessionsWithImages = await Promise.all(sessions.map(async session => {
+    const result = session.result_json as Record<string, unknown>;
+    const assets = Array.isArray(result.imageAssets) ? result.imageAssets : [];
+    const imageUrls = await Promise.all(assets.map(async raw => {
+      if (!raw || typeof raw !== 'object' || typeof (raw as Record<string, unknown>).path !== 'string') return null;
+      const asset = raw as { imageId?: string; path: string };
+      const { data: signed, error: signedError } = await ctx.supabase.storage
+        .from('shelf-captures').createSignedUrl(asset.path, 600);
+      if (signedError || !signed) return null;
+      return { imageId: asset.imageId ?? '', url: signed.signedUrl };
+    }));
+    return { ...session, imageUrls: imageUrls.filter(Boolean) };
+  }));
+  const ids = sessions.map(row => row.id);
   const reviewsResult = ids.length
     ? await ctx.supabase.from('analysis_reviews').select('id,analysis_session_id,reviewer_id,review_json,created_at').in('analysis_session_id', ids).order('created_at', { ascending: false })
     : { data: [], error: null };
   if (reviewsResult.error) return fail('تعذر تحميل المراجعات المحفوظة.', 503);
 
-  return NextResponse.json({ sessions: data ?? [], reviews: reviewsResult.data ?? [] });
+  return NextResponse.json({ sessions: sessionsWithImages, reviews: reviewsResult.data ?? [] });
 }
 
 export async function POST(request: NextRequest) {
