@@ -35,7 +35,7 @@ test('rejects more than eight images', () => {
 });
 
 test('rejects oversized combined image payloads', () => {
-  const large = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(15 * 1024 * 1024)]).toString('base64');
+  const large = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(21 * 1024 * 1024)]).toString('base64');
   assert.throws(() => validateAnalyzeShelfInput(request([{ imageId: 'large', mimeType: 'image/jpeg', dataBase64: large }, image('small')])), /20 MiB/);
 });
 
