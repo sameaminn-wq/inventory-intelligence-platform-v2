@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     return jsonError('تعذر قراءة بيانات جلسة التصوير.', 400);
   }
   if (!isRecord(input) || typeof input.captureSessionId !== 'string' ||
-      input.captureSessionId.trim().length === 0 || input.captureSessionId.length > 128 ||
+      input.captureSessionId.trim().length === 0 || input.captureSessionId.length > 128 || !/^[A-Za-z0-9_-]+$/.test(input.captureSessionId) ||
       typeof input.storeId !== 'string' || input.storeId.trim().length === 0 || input.storeId.length > 128 ||
       !Array.isArray(input.images) || input.images.length < 1 || input.images.length > MAX_IMAGES) {
     return jsonError('جلسة التحليل غير مكتملة أو تحتوي على عدد صور غير صالح.', 400);
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
   const images: Array<{ imageId: string; mimeType: string; dataBase64: string }> = [];
   for (const [index, raw] of input.images.entries()) {
     if (!isRecord(raw) || typeof raw.imageId !== 'string' || !raw.imageId.trim() ||
-        raw.imageId.length > 128 || seen.has(raw.imageId) ||
+        raw.imageId.length > 128 || !/^[A-Za-z0-9_-]+$/.test(raw.imageId) || seen.has(raw.imageId) ||
         typeof raw.mimeType !== 'string' || !MIME_TYPES.has(raw.mimeType) ||
         typeof raw.dataBase64 !== 'string' || raw.dataBase64.length === 0 ||
         raw.dataBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(raw.dataBase64) ||
@@ -220,6 +220,21 @@ export async function POST(request: NextRequest) {
       return jsonError('تحتوي نتيجة التحليل على معرفات منتجات غير متسقة.', 502);
     }
 
+    const imageAssets: Array<{ imageId: string; path: string }> = [];
+    for (const image of images) {
+      const path = `${input.storeId}/${userId}/${input.captureSessionId}/${image.imageId}.jpg`;
+      const bytes = new Uint8Array(Buffer.from(image.dataBase64, 'base64'));
+      const { error: uploadError } = await supabase.storage
+        .from('shelf-captures')
+        .upload(path, bytes, { contentType: image.mimeType, upsert: false });
+      if (uploadError) {
+        console.error('Shelf capture upload failed:', uploadError.name);
+        return jsonError('تعذر حفظ إحدى صور الجلسة بأمان. لم نحفظ نتيجة التحليل كجلسة مكتملة.', 503);
+      }
+      imageAssets.push({ imageId: image.imageId, path });
+    }
+
+    const persistedResult = { ...result, imageAssets };
     const { data: persistedSession, error: persistError } = await supabase
       .from('analysis_sessions')
       .insert({
@@ -230,7 +245,7 @@ export async function POST(request: NextRequest) {
         model,
         status: 'pending_review',
         review_required: true,
-        result_json: result,
+        result_json: persistedResult,
       })
       .select('id, created_at')
       .single();
@@ -241,7 +256,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      analysisSessionId: persistedSession.id,
+      imageAssets,\n      analysisSessionId: persistedSession.id,
       createdAt: persistedSession.created_at,
       storeId: input.storeId,
       provider: 'gemini',
