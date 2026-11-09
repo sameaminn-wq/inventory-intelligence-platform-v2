@@ -83,6 +83,7 @@ export default function ReviewPage() {
           return <article className="review-item" key={session.id}>
             <div className="section-head"><div><h3>جلسة {session.capture_session_id.slice(0,18)}</h3><p className="panel-subtitle">{new Date(session.created_at).toLocaleString('ar-EG')} · {session.provider} / {session.model}</p></div><span className={latest?'member-status active':'member-status invited'}>{latest?'لها مراجعة محفوظة':'بانتظار المراجعة'}</span></div>
             {session.result_json?.warnings?.length ? <div className="notice">{session.result_json.warnings.map((w,i)=><p key={i}>{w}</p>)}</div> : null}
+            {session.imageUrls?.length ? <div className="review-list">{session.imageUrls.map(image=><figure key={image.imageId}><img className="review-source-image" src={image.url} alt="صورة رف محفوظة للجلسة" loading="lazy" /><figcaption className="panel-subtitle">{image.imageId}</figcaption></figure>)}</div> : null}
             <p className="panel-subtitle">{observations.length} ملاحظة منتج · {sessionReviews.length} مراجعة محفوظة</p>
             {observations.map(item=><div className="metric-list" key={item.detectionId}>
               <span><b>{item.candidateProductName || 'منتج غير محدد'}</b> — {item.brand || 'علامة غير معروفة'}</span>
