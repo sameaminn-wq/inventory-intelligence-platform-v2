@@ -28,6 +28,7 @@ type Analysis = {
 const SESSION_KEY = 'inventory.capture-session.v1';
 const ANALYSIS_KEY = 'inventory.analysis-result.v1';
 const MAX_UPLOAD_BYTES = 2.8 * 1024 * 1024;
+const MAX_REVIEW_QUANTITY = 100000;
 
 async function compressForVercel(dataUrl: string): Promise<string> {
   const image = new Image();
@@ -53,6 +54,7 @@ export default function AnalysisPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     try {
@@ -117,6 +119,14 @@ export default function AnalysisPage() {
 
   function saveHumanReview() {
     if (!analysis) return;
+    const hasInvalidQuantity = analysis.observations.some((item) => {
+      const value = quantities[item.detectionId] ?? '';
+      return value !== '' && (!/^\\d+$/.test(value) || Number(value) > MAX_REVIEW_QUANTITY);
+    });
+    if (hasInvalidQuantity) {
+      setError('راجع الكميات المدخلة: يجب أن تكون أعدادًا صحيحة من صفر إلى 100,000.');
+      return;
+    }
     const review = {
       schemaVersion: 'human-review-local-1.0',
       captureSessionId: analysis.captureSessionId,
@@ -164,11 +174,12 @@ export default function AnalysisPage() {
                 <div><h3>{item.candidateProductName || 'منتج غير محدد'}</h3><p className="panel-subtitle">{item.brand || 'علامة تجارية غير محددة'} · الصورة: {item.sourceImageId}</p></div>
                 <span className="environment-tag">ثقة الهوية {(item.identityConfidence * 100).toFixed(0)}%</span>
               </div>
+              {previewImages[item.sourceImageId] && <img className="review-source-image" src={previewImages[item.sourceImageId]} alt="الصورة الأصلية التي استُخرجت منها الملاحظة" loading="lazy" />}
               {item.packageDescription && <p>{item.packageDescription}</p>}
               <div className="metric-list">
                 <span>الكمية المرئية المقدرة بواسطة AI: <b>{item.estimatedVisibleQuantity === null ? 'غير معروفة' : item.estimatedVisibleQuantity}</b></span>
                 <label>الكمية المرئية التي تحققت منها
-                  <input type="number" min="0" step="1" value={quantities[item.detectionId] ?? ''} onChange={(event) => setQuantities((current) => ({ ...current, [item.detectionId]: event.target.value }))} placeholder="أدخل العدد بعد المراجعة" />
+                  <input type="number" min="0" max={MAX_REVIEW_QUANTITY} step="1" inputMode="numeric" value={quantities[item.detectionId] ?? ''} onChange={(event) => setQuantities((current) => ({ ...current, [item.detectionId]: event.target.value }))} placeholder="أدخل العدد بعد المراجعة" />
                 </label>
               </div>
               {item.reviewReasons.length > 0 && <p className="notice">أسباب المراجعة: {item.reviewReasons.join('، ')}</p>}
