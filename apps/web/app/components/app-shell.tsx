@@ -12,6 +12,7 @@ const navigation = [
   { href: '/analysis/', label: 'تحليل الرف', icon: '⌁' },
   { href: '/review/', label: 'مراجعة التحليل', icon: '✓' },
   { href: '/reports/', label: 'التقارير والتصدير', icon: '▥' },
+  { href: '/team/', label: 'إدارة الفريق', icon: '♙' },
 ];
 
 export function AppShell({
