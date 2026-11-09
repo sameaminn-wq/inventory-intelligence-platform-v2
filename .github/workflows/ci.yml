@@ -33,5 +33,7 @@ jobs:
         run: npm install
       - name: Build all workspaces
         run: npm run build
-      - name: Test AI service result validation
+      - name: Test Core API
+        run: npm run test --workspace @inventory/api
+      - name: Test AI service
         run: npm run test --workspace @inventory/ai-service
