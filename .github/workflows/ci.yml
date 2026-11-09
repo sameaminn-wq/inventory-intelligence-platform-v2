@@ -4,15 +4,22 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, 'bootstrap/**']
+    branches: [main, 'bootstrap/**', 'phase-1/**']
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-and-audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - run: npm install
-      - run: npm run build
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Build API and web
+        run: npm run build
