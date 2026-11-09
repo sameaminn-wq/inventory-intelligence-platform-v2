@@ -31,6 +31,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Test smart capture guidance
+        run: npm run test --workspace @inventory/web
       - name: Build all workspaces
         run: npm run build
       - name: Test Core API
