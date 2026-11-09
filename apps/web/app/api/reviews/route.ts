@@ -77,5 +77,12 @@ export async function POST(request: NextRequest) {
     .insert({ analysis_session_id: session.id, reviewer_id: ctx.userId, review_json: reviewJson })
     .select('id,created_at').single();
   if (error || !review) return fail('تعذر حفظ المراجعة بشكل دائم.', 503);
+  const { error: statusError } = await ctx.supabase.from('analysis_sessions')
+    .update({ status: 'reviewed', reviewed_at: review.created_at })
+    .eq('id', session.id);
+  if (statusError) {
+    console.error('Analysis review status update failed:', statusError.code);
+    return fail('حُفظت المراجعة، لكن تعذر تحديث حالة الجلسة. حدّث الصفحة للتحقق.', 503);
+  }
   return NextResponse.json({ reviewId: review.id, createdAt: review.created_at }, { status: 201 });
 }
