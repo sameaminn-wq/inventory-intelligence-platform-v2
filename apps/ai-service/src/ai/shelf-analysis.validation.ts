@@ -73,8 +73,9 @@ export function validateShelfAnalysisResult(
     throw new Error('AI provider returned duplicate detection identifiers');
   }
 
+  const matchedDetectionIds = new Set<string>();
   const crossViewMatches = value.crossViewMatches.map((raw, index) => {
-    if (!isRecord(raw) || typeof raw.matchGroupId !== 'string' ||
+    if (!isRecord(raw) || typeof raw.matchGroupId !== 'string' || raw.matchGroupId.length === 0 ||
         !Array.isArray(raw.detectionIds) || raw.detectionIds.length < 2 ||
         !raw.detectionIds.every((id) => typeof id === 'string') ||
         new Set(raw.detectionIds).size !== raw.detectionIds.length ||
@@ -84,12 +85,26 @@ export function validateShelfAnalysisResult(
     if (!raw.detectionIds.every((id) => detectionIds.has(id as string))) {
       throw new Error(`Cross-view match ${index} references an unknown detection`);
     }
+    const sourceImages = new Set<string>();
+    for (const id of raw.detectionIds as string[]) {
+      if (matchedDetectionIds.has(id)) {
+        throw new Error(`Detection ${id} appears in more than one cross-view match group`);
+      }
+      matchedDetectionIds.add(id);
+      const observation = observations.find((item) => item.detectionId === id);
+      if (observation) sourceImages.add(observation.sourceImageId as string);
+    }
+    if (sourceImages.size < 2) {
+      throw new Error(`Cross-view match ${index} must link detections from at least two different images`);
+    }
     return raw;
   });
 
   if (!Array.isArray(value.unmatchedDetectionIds) ||
-      !value.unmatchedDetectionIds.every((id) => typeof id === 'string' && detectionIds.has(id))) {
-    throw new Error('AI provider returned invalid unmatched detection references');
+      !value.unmatchedDetectionIds.every((id) => typeof id === 'string' && detectionIds.has(id)) ||
+      new Set(value.unmatchedDetectionIds).size !== value.unmatchedDetectionIds.length ||
+      value.unmatchedDetectionIds.some((id) => matchedDetectionIds.has(id as string))) {
+    throw new Error('AI provider returned invalid or conflicting unmatched detection references');
   }
   if (!Array.isArray(value.warnings) || !value.warnings.every((item) => typeof item === 'string') ||
       typeof value.reviewRequired !== 'boolean') {
