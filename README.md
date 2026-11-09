@@ -25,7 +25,7 @@ A first deployable web/API foundation is being implemented on `bootstrap/phase-1
 - [Roadmap](docs/ROADMAP.md)
 
 ## AI implementation status
-The provider-neutral gateway module and an initial Gemini REST adapter are scaffolded in `apps/api/src/ai`. This is an internal service foundation only: no public analysis endpoint, storage integration, authentication flow, database persistence, automated tests or production provider credentials are wired yet. Gemini model selection is server-side via `GEMINI_MODEL`; credentials use `GEMINI_API_KEY` and must never be exposed to clients.
+The independently deployable NestJS AI API is scaffolded in `apps/ai-service`. It exposes `GET /health` and a service-token-protected `POST /internal/v1/analyses`, with Gemini as the first configurable provider. The Core API is not yet connected to it; private object-storage integration, persisted analysis runs, automated tests, provider alternatives and production credentials remain pending. Configure `GEMINI_MODEL`, `GEMINI_API_KEY` and `AI_SERVICE_TOKEN` only in the AI service environment. Never expose these secrets to clients.
 
 ## Working agreement
 Read [AGENTS.md](AGENTS.md) before making changes. Keep changes small, tested, and documented. Never expose secrets or use client-supplied tenant identifiers as authorization.
