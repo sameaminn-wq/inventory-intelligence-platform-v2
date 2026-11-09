@@ -184,3 +184,21 @@ button:focus-visible, a:focus-visible { outline:3px solid #80b99a; outline-offse
 .store-picker label{font-weight:700}
 .store-picker select{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--border,#cbd5e1);border-radius:10px;background:var(--surface,#fff);color:inherit}
 .signout-button{margin-inline-start:auto;border:1px solid var(--border,#cbd5e1);border-radius:8px;background:transparent;padding:6px 10px;color:inherit;cursor:pointer}
+
+
+/* Team and store administration */
+.team-section{margin-top:16px}
+.team-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px;align-items:end}
+.team-form label,.team-field{display:grid;gap:7px;font-weight:700;color:var(--ink)}
+.team-form input,.team-form select,.team-field select,.team-table select{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.team-form button{min-height:42px}
+.team-form.invite-form{grid-template-columns:2fr 1fr auto}
+.team-tag,.team-count{border-radius:20px;padding:7px 11px;background:var(--green-soft);color:var(--green);font-size:11px;font-weight:700;white-space:nowrap}
+.team-id{display:block;max-width:220px;margin-top:5px;color:var(--muted);font-size:10px;direction:ltr;text-align:right;overflow-wrap:anywhere}
+.member-status{display:inline-block;padding:5px 9px;border-radius:20px;background:#eef2ef;color:#526158;font-size:11px;white-space:nowrap}
+.member-status.active{background:#e7f4eb;color:#21633f}
+.member-status.invited{background:#fff5df;color:#795c20}
+.member-status.suspended{background:#fcebea;color:#963b37}
+.team-table td{vertical-align:middle}
+.team-table select{min-width:130px}
+@media(max-width:680px){.team-form,.team-form.invite-form{grid-template-columns:1fr}.team-form button{width:100%}.team-section .section-head{flex-direction:row;align-items:center}}
