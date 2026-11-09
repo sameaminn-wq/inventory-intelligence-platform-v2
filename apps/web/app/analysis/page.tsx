@@ -154,7 +154,7 @@ export default function AnalysisPage() {
     }
   }
 
-  function saveHumanReview() {
+  async function saveHumanReview() {
     if (!analysis) return;
     const hasInvalidQuantity = analysis.observations.some((item) => {
       const value = quantities[item.detectionId] ?? '';
@@ -181,8 +181,29 @@ export default function AnalysisPage() {
       })),
       note: 'Human review draft only. No inventory database was changed.',
     };
-    window.sessionStorage.setItem('inventory.human-review.v1', JSON.stringify(review));
-    setSaved(true);
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          analysisSessionId: analysis.analysisSessionId,
+          observations: review.observations.map((item) => ({
+            detectionId: item.detectionId,
+            verifiedQuantity: item.humanVerifiedVisibleQuantity,
+            accepted: item.humanVerifiedVisibleQuantity !== null,
+            note: item.reviewReasons.join('، ').slice(0, 500),
+          })),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'تعذر حفظ المراجعة.');
+      window.sessionStorage.setItem('inventory.human-review.v1', JSON.stringify({
+        ...review, persistedReviewId: payload.reviewId, persistedAt: payload.createdAt,
+      }));
+      setSaved(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر حفظ المراجعة بشكل دائم.');
+    }
   }
 
   return (
@@ -238,8 +259,8 @@ export default function AnalysisPage() {
           ))}
         </div>
         {analysis.observations.length > 0 && <div className="capture-session-actions">
-          <button className="primary-button" type="button" onClick={saveHumanReview}>حفظ المراجعة البشرية محليًا</button>
-          {saved && <span className="panel-subtitle" role="status">تم حفظ مسودة المراجعة في ذاكرة المتصفح فقط.</span>}
+          <button className="primary-button" type="button" onClick={saveHumanReview}>حفظ المراجعة البشرية</button>
+          {saved && <span className="panel-subtitle" role="status">تم حفظ المراجعة بشكل دائم في قاعدة البيانات.</span>}
         </div>}
         <div className="notice">{analysis.note} لا يتم تحديث المخزون من هذه الصفحة؛ الكميات المرئية المقدرة منفصلة عن الكميات التي تحقق منها الموظف.</div>
       </section>}
