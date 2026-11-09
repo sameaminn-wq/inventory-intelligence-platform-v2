@@ -9,9 +9,12 @@ const proxySource = fs.readFileSync(
 );
 
 test('normalizes trailing slashes before classifying routes', () => {
-  assert.match(
-    proxySource,
-    /const pathname = request\.nextUrl\.pathname\.replace\(\/\\\\\+\$\/, ''\) \|\| '\/'/,
+  const normalizationLine = proxySource
+    .split('\n')
+    .find((line) => line.includes('const pathname ='));
+  assert.equal(
+    normalizationLine?.trim(),
+    String.raw`const pathname = request.nextUrl.pathname.replace(/\/+$/, '') || '/';`,
   );
 
   const normalizePathname = (pathname) => pathname.replace(/\/+$/, '') || '/';
