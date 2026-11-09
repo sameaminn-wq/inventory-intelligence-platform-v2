@@ -256,7 +256,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      imageAssets,\n      analysisSessionId: persistedSession.id,
+      imageAssets,
+      analysisSessionId: persistedSession.id,
       createdAt: persistedSession.created_at,
       storeId: input.storeId,
       provider: 'gemini',
