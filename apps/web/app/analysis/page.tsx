@@ -6,6 +6,7 @@ import { loadLatestCaptureSession } from '../../lib/capture-session-store';
 
 type Frame = { id: string; dataUrl: string; mimeType?: string };
 type Session = { captureSessionId: string; frames: Frame[] };
+type StoreOption = { id: string; name: string; slug: string; role: string };
 type Observation = {
   detectionId: string;
   sourceImageId: string;
@@ -49,6 +50,9 @@ async function compressForVercel(dataUrl: string): Promise<string> {
 
 export default function AnalysisPage() {
   const [session, setSession] = useState<Session | null>(null);
+  const [stores, setStores] = useState<StoreOption[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [storesLoading, setStoresLoading] = useState(true);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -60,6 +64,15 @@ export default function AnalysisPage() {
     let active = true;
     async function restoreLocalData() {
       try {
+        const storesResponse = await fetch('/api/stores', { cache: 'no-store' });
+        const storesPayload = await storesResponse.json();
+        if (!storesResponse.ok) throw new Error(storesPayload.error || 'تعذر تحميل المتاجر.');
+        if (active) {
+          const availableStores = Array.isArray(storesPayload.stores) ? storesPayload.stores as StoreOption[] : [];
+          setStores(availableStores);
+          if (availableStores.length === 1) setSelectedStoreId(availableStores[0].id);
+        }
+        setStoresLoading(false);
         const storedSession = await loadLatestCaptureSession();
         if (!active) return;
         if (storedSession) {
@@ -75,8 +88,11 @@ export default function AnalysisPage() {
             item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
           ])));
         }
-      } catch {
-        if (active) setError('تعذر استعادة جلسة التصوير من التخزين المحلي. ارجع إلى صفحة التصوير وابدأ جلسة جديدة.');
+      } catch (cause) {
+        if (active) {
+          setStoresLoading(false);
+          setError(cause instanceof Error ? cause.message : 'تعذر استعادة جلسة التصوير أو تحميل المتاجر.');
+        }
       }
     }
     void restoreLocalData();
@@ -91,6 +107,10 @@ export default function AnalysisPage() {
 
   async function runAnalysis() {
     if (!session || session.frames.length === 0 || busy) return;
+    if (!selectedStoreId) {
+      setError('اختر المتجر الذي التقطت له الصور قبل بدء التحليل.');
+      return;
+    }
     setBusy(true);
     setError('');
     setSaved(false);
@@ -108,7 +128,7 @@ export default function AnalysisPage() {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ captureSessionId: session.captureSessionId, images }),
+        body: JSON.stringify({ captureSessionId: session.captureSessionId, storeId: selectedStoreId, images }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'فشل تحليل الصور.');
@@ -139,6 +159,7 @@ export default function AnalysisPage() {
     const review = {
       schemaVersion: 'human-review-local-1.0',
       captureSessionId: analysis.captureSessionId,
+      storeId: selectedStoreId,
       reviewedAt: new Date().toISOString(),
       inventoryUpdated: false,
       observations: analysis.observations.map((item) => ({
@@ -163,9 +184,17 @@ export default function AnalysisPage() {
           <div><h2>جلسة التصوير</h2><p className="panel-subtitle">{session ? session.captureSessionId : 'لا توجد جلسة مستعادة'}</p></div>
           <span className="environment-tag">{imageCount} صور</span>
         </div>
+        {!storesLoading && stores.length === 0 && <div className="notice">حسابك لا يرتبط حاليًا بأي متجر نشط. اطلب من مدير النظام إضافتك إلى متجر قبل إجراء التحليل.</div>}
+        {stores.length > 0 && <div className="store-picker">
+          <label htmlFor="analysis-store">المتجر الذي تنتمي إليه الصور</label>
+          <select id="analysis-store" value={selectedStoreId} onChange={(event) => setSelectedStoreId(event.target.value)}>
+            <option value="">اختر متجرًا</option>
+            {stores.map((store) => <option key={store.id} value={store.id}>{store.name} — {store.role}</option>)}
+          </select>
+        </div>}
         {!session && <div className="empty-state"><h3>لا توجد جلسة جاهزة للتحليل</h3><p>ارجع إلى صفحة التصوير والتقط صورة واسعة وصور الأجزاء المطلوبة.</p><a className="primary-button" href="/capture/">العودة للتصوير</a></div>}
         {session && <div className="capture-session-actions">
-          <button className="primary-button" type="button" onClick={runAnalysis} disabled={busy || imageCount === 0}>{busy ? 'جارٍ ضغط الصور وتحليلها…' : analysis ? 'إعادة التحليل' : 'بدء تحليل الصور'}</button>
+          <button className="primary-button" type="button" onClick={runAnalysis} disabled={busy || imageCount === 0 || !selectedStoreId || stores.length === 0}>{busy ? 'جارٍ ضغط الصور وتحليلها…' : analysis ? 'إعادة التحليل' : 'بدء تحليل الصور'}</button>
           <span className="panel-subtitle">حجم الصور الأصلي التقريبي: {(estimatedPayloadBytes / (1024 * 1024)).toFixed(2)} ميجابايت. يتم ضغطها داخل المتصفح قبل الإرسال.</span>
         </div>}
         {error && <p className="error-message" role="alert">{error}</p>}
