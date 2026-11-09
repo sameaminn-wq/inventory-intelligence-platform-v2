@@ -16,6 +16,7 @@ Create or configure the Vercel project with:
 
 Set these server-only environment variables in Vercel Preview:
 
+- `ANALYSIS_API_ENABLED=false` initially; change to `true` only for a protected Preview after reviewing access and spend controls.
 - `GEMINI_API_KEY` — secret API key; never prefix with `NEXT_PUBLIC_`.
 - `GEMINI_MODEL` — the exact Gemini model ID selected for this project.
 
@@ -31,15 +32,16 @@ The separate AI service's 20 MiB validation limit does not override the Vercel F
 
 This integration is a development/preview slice, not production-ready:
 
-- There is not yet user authentication, store membership authorization, or capture-session ownership enforcement.
-- The API route protects the provider key but is not yet protected against unauthorized public use or cost abuse. Do not expose it on a public production domain until authentication and durable rate limiting are implemented.
+- There is not yet application user authentication, store membership authorization, capture-session ownership enforcement, or durable per-user rate limiting.
+- Keep the Vercel project on Preview deployments with Vercel Deployment Protection enabled while testing. Do not enable `ANALYSIS_API_ENABLED` on a publicly accessible deployment. Deployment Protection is an environment access gate, not application-level user/store authorization.
+- Before public/production access, implement authenticated user sessions, store membership checks, durable rate limits/quotas, and abuse monitoring. The API route protects the provider key but is not by itself an authorization boundary.
 - Analysis and human review drafts are stored in browser session storage only. They are not persisted to a database.
 - Saving a human review draft does not update inventory.
 - AI output is untrusted and requires human review. Unknown or occluded quantities must remain unknown.
 
 ## Manual verification
 
-1. Configure the two Preview environment variables in Vercel.
+1. Enable Vercel Preview Deployment Protection and configure `ANALYSIS_API_ENABLED=true`, `GEMINI_API_KEY`, and `GEMINI_MODEL` in Preview only.
 2. Deploy a Preview from `architecture/multi-provider-ai`.
 3. Capture a small shelf session on a phone.
 4. Open `/analysis`, run analysis, and verify that the result is editable as a human review draft.
