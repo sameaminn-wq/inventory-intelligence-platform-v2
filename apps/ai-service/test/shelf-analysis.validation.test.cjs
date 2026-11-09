@@ -148,12 +148,19 @@ test('rejects model output with too many observations', () => {
 
 test('rejects duplicate cross-view match group identifiers', () => {
   const payload = validPayload();
-  payload.crossViewMatches.push({
-    ...payload.crossViewMatches[0],
-    detectionIds: ['detection-a', 'detection-c'],
+  payload.observations.push({
+    ...payload.observations[1],
+    detectionId: 'detection-d',
+    sourceImageId: 'image-b',
   });
-  // The second match also conflicts with the first group; either invariant must reject it.
-  assert.throws(() => validate(payload), /Invalid cross-view match|more than one cross-view match group/);
+  payload.unmatchedDetectionIds = [];
+  payload.crossViewMatches.push({
+    matchGroupId: payload.crossViewMatches[0].matchGroupId,
+    detectionIds: ['detection-c', 'detection-d'],
+    matchConfidence: 0.7,
+    rationale: 'A separate cross-view pair',
+  });
+  assert.throws(() => validate(payload), /Invalid cross-view match at index 1/);
 });
 
 test('rejects excessively long model-generated warning strings', () => {
