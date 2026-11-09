@@ -23,10 +23,11 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
-  const isLogin = request.nextUrl.pathname === '/login' || request.nextUrl.pathname.startsWith('/auth/');
-  const isProtected = ['/capture', '/analysis', '/inventory', '/review', '/reports'].some(
-    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + '/'),
-  );
+  const pathname = request.nextUrl.pathname;
+  const isLogin = pathname === '/login' || pathname.startsWith('/auth/');
+  const isApi = pathname.startsWith('/api/');
+  const isPublic = isLogin || isApi;
+  const isProtected = !isPublic;
 
   if (error || !claims) {
     if (isProtected) {
