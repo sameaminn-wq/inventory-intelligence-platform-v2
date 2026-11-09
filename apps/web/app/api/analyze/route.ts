@@ -95,6 +95,14 @@ export async function POST(request: NextRequest) {
     return jsonError('مسار التحليل غير مفعّل لهذه البيئة بعد.', 503);
   }
 
+  const { data: quotaAllowed, error: quotaError } = await supabase.rpc('consume_analysis_quota', {
+    p_store_id: input.storeId,
+    p_image_count: images.length,
+    p_payload_bytes: totalBytes,
+  });
+  if (quotaError) return jsonError('تعذر التحقق من رصيد التحليل. أوقفنا الطلب لحماية حسابك.', 503);
+  if (quotaAllowed !== true) return jsonError('وصلت إلى الحد اليومي للتحليل لهذا المستخدم والمتجر، أو لا تسمح صلاحيات العضوية بالتحليل.', 429);
+
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL;
   if (!apiKey || !model) return jsonError('خدمة التحليل غير مهيأة بعد. أضف إعدادات مزود الذكاء الاصطناعي في Vercel.', 503);
