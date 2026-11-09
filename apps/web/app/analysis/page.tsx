@@ -18,6 +18,7 @@ type Observation = {
   reviewReasons: string[];
 };
 type Analysis = {
+  analysisSessionId: string;
   captureSessionId: string;
   storeId: string;
   provider: string;
