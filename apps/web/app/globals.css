@@ -178,3 +178,9 @@ button:focus-visible, a:focus-visible { outline:3px solid #80b99a; outline-offse
 .auth-card form input{width:100%;padding:12px;border:1px solid var(--border,#cbd5e1);border-radius:10px;background:transparent;color:inherit}
 .auth-card form .primary-button{margin-top:16px;width:100%;justify-content:center}
 .auth-footnote{font-size:.85rem;border-top:1px solid var(--border,#e0e5ed);padding-top:14px}
+
+
+.store-picker{display:grid;gap:8px;max-width:520px;margin:18px 0}
+.store-picker label{font-weight:700}
+.store-picker select{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--border,#cbd5e1);border-radius:10px;background:var(--surface,#fff);color:inherit}
+.signout-button{margin-inline-start:auto;border:1px solid var(--border,#cbd5e1);border-radius:8px;background:transparent;padding:6px 10px;color:inherit;cursor:pointer}
