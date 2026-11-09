@@ -27,7 +27,7 @@ type Analysis = {
 
 const SESSION_KEY = 'inventory.capture-session.v1';
 const ANALYSIS_KEY = 'inventory.analysis-result.v1';
-const MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 2.8 * 1024 * 1024;
 
 async function compressForVercel(dataUrl: string): Promise<string> {
   const image = new Image();
