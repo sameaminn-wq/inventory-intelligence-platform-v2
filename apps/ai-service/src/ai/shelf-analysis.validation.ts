@@ -1,13 +1,22 @@
 import { ShelfAnalysisResult } from './ai-provider.types';
 
+const MAX_OBSERVATIONS = 500;
+const MAX_MATCH_GROUPS = 250;
+const MAX_DETECTIONS_PER_MATCH = 32;
+const MAX_WARNINGS = 50;
+const MAX_TEXT_LENGTH = 500;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const isConfidence = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 
-const isNullableString = (value: unknown): value is string | null =>
-  value === null || typeof value === 'string';
+const isNullableString = (value: unknown, maxLength = MAX_TEXT_LENGTH): value is string | null =>
+  value === null || (typeof value === 'string' && value.length <= maxLength);
+
+const isStringList = (value: unknown, maxItems: number, maxLength: number): value is string[] =>
+  Array.isArray(value) && value.length <= maxItems &&
+  value.every((item) => typeof item === 'string' && item.length <= maxLength);
 
 const isBoundingBox = (value: unknown): boolean => {
   if (value === null) return true;
@@ -33,8 +42,9 @@ export function validateShelfAnalysisResult(
   if (value.captureSessionId !== expectedSessionId) {
     throw new Error('AI provider returned a mismatched capture session');
   }
-  if (!Array.isArray(value.observations) || !Array.isArray(value.crossViewMatches)) {
-    throw new Error('AI provider result is missing observations or cross-view matches');
+  if (!Array.isArray(value.observations) || value.observations.length > MAX_OBSERVATIONS ||
+      !Array.isArray(value.crossViewMatches) || value.crossViewMatches.length > MAX_MATCH_GROUPS) {
+    throw new Error('AI provider result exceeds observation or cross-view match limits');
   }
 
   const allowedImageIds = new Set(expectedImageIds);
@@ -44,8 +54,8 @@ export function validateShelfAnalysisResult(
 
   const observations = value.observations.map((raw, index) => {
     if (!isRecord(raw)) throw new Error(`Invalid observation at index ${index}`);
-    if (typeof raw.detectionId !== 'string' || !raw.detectionId) {
-      throw new Error(`Observation ${index} has no detectionId`);
+    if (typeof raw.detectionId !== 'string' || raw.detectionId.length === 0 || raw.detectionId.length > 128) {
+      throw new Error(`Observation ${index} has an invalid detectionId`);
     }
     if (typeof raw.sourceImageId !== 'string' || !allowedImageIds.has(raw.sourceImageId)) {
       throw new Error(`Observation ${index} references an image outside the capture session`);
@@ -57,11 +67,11 @@ export function validateShelfAnalysisResult(
     if (!isConfidence(raw.identityConfidence)) {
       throw new Error(`Observation ${index} has invalid identity confidence`);
     }
-    if (!isNullableString(raw.candidateProductName) || !isNullableString(raw.brand) ||
-        !isNullableString(raw.packageDescription) || !isBoundingBox(raw.boundingBox)) {
+    if (!isNullableString(raw.candidateProductName, 200) || !isNullableString(raw.brand, 120) ||
+        !isNullableString(raw.packageDescription, 300) || !isBoundingBox(raw.boundingBox)) {
       throw new Error(`Observation ${index} has invalid product or bounding-box fields`);
     }
-    if (!Array.isArray(raw.reviewReasons) || !raw.reviewReasons.every((item) => typeof item === 'string')) {
+    if (!isStringList(raw.reviewReasons, 20, 120)) {
       throw new Error(`Observation ${index} has invalid review reasons`);
     }
     return raw;
@@ -74,14 +84,21 @@ export function validateShelfAnalysisResult(
   }
 
   const matchedDetectionIds = new Set<string>();
+  const matchGroupIds = new Set<string>();
+  const observationById = new Map(observations.map((item) => [item.detectionId as string, item]));
   const crossViewMatches = value.crossViewMatches.map((raw, index) => {
-    if (!isRecord(raw) || typeof raw.matchGroupId !== 'string' || raw.matchGroupId.length === 0 ||
+    if (!isRecord(raw) || typeof raw.matchGroupId !== 'string' ||
+        raw.matchGroupId.length === 0 || raw.matchGroupId.length > 128 ||
+        matchGroupIds.has(raw.matchGroupId) ||
         !Array.isArray(raw.detectionIds) || raw.detectionIds.length < 2 ||
-        !raw.detectionIds.every((id) => typeof id === 'string') ||
+        raw.detectionIds.length > MAX_DETECTIONS_PER_MATCH ||
+        !raw.detectionIds.every((id) => typeof id === 'string' && id.length <= 128) ||
         new Set(raw.detectionIds).size !== raw.detectionIds.length ||
-        !isConfidence(raw.matchConfidence) || typeof raw.rationale !== 'string') {
+        !isConfidence(raw.matchConfidence) ||
+        typeof raw.rationale !== 'string' || raw.rationale.length > 1000) {
       throw new Error(`Invalid cross-view match at index ${index}`);
     }
+    matchGroupIds.add(raw.matchGroupId);
     if (!raw.detectionIds.every((id) => detectionIds.has(id as string))) {
       throw new Error(`Cross-view match ${index} references an unknown detection`);
     }
@@ -91,7 +108,7 @@ export function validateShelfAnalysisResult(
         throw new Error(`Detection ${id} appears in more than one cross-view match group`);
       }
       matchedDetectionIds.add(id);
-      const observation = observations.find((item) => item.detectionId === id);
+      const observation = observationById.get(id);
       if (observation) sourceImages.add(observation.sourceImageId as string);
     }
     if (sourceImages.size < 2) {
@@ -101,12 +118,13 @@ export function validateShelfAnalysisResult(
   });
 
   if (!Array.isArray(value.unmatchedDetectionIds) ||
+      value.unmatchedDetectionIds.length > MAX_OBSERVATIONS ||
       !value.unmatchedDetectionIds.every((id) => typeof id === 'string' && detectionIds.has(id)) ||
       new Set(value.unmatchedDetectionIds).size !== value.unmatchedDetectionIds.length ||
       value.unmatchedDetectionIds.some((id) => matchedDetectionIds.has(id as string))) {
     throw new Error('AI provider returned invalid or conflicting unmatched detection references');
   }
-  if (!Array.isArray(value.warnings) || !value.warnings.every((item) => typeof item === 'string') ||
+  if (!isStringList(value.warnings, MAX_WARNINGS, MAX_TEXT_LENGTH) ||
       typeof value.reviewRequired !== 'boolean') {
     throw new Error('AI provider returned invalid review metadata');
   }
