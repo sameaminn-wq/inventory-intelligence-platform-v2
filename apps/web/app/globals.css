@@ -138,3 +138,16 @@ button:focus-visible, a:focus-visible { outline:3px solid #80b99a; outline-offse
   .capture-actions > button { flex:1 1 auto; }
   .section-head { flex-direction:column; }
 }
+
+.capture-mode-panel { margin-top:18px; padding:14px; border:1px solid var(--line); border-radius:10px; background:#fbfdfb; }
+.capture-mode-panel > strong { display:block; margin-bottom:10px; font-size:12px; }
+.capture-mode-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.mode-button { border:1px solid #d5e2da; background:#fff; color:#42564a; border-radius:8px; padding:9px 12px; cursor:pointer; }
+.mode-button.selected { border-color:var(--green); background:var(--green-soft); color:var(--green); font-weight:700; }
+.mode-button:disabled { opacity:.45; cursor:not-allowed; }
+.overlap-control { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:13px; color:var(--muted); font-size:12px; }
+.overlap-control select { min-width:190px; border:1px solid var(--line); border-radius:7px; background:#fff; padding:8px; color:var(--ink); }
+.capture-session-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.capture-session-actions .secondary-button, .capture-session-actions .text-button { font-size:11px; }
+.motion-meter { display:block; margin-top:7px; color:var(--green); }
+@media (max-width:680px) { .capture-session-actions { width:100%; } .capture-session-actions button { flex:1 1 auto; } }
