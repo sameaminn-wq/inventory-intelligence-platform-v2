@@ -10,6 +10,22 @@ import { validateShelfAnalysisResult } from '../shelf-analysis.validation';
 const MAX_IMAGES_PER_REQUEST = 8;
 const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;
 
+function matchesImageSignature(mimeType: string, bytes: Buffer): boolean {
+  switch (mimeType) {
+    case 'image/jpeg':
+      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case 'image/png':
+      return bytes.length >= 8 &&
+        bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    case 'image/webp':
+      return bytes.length >= 12 &&
+        bytes.toString('ascii', 0, 4) === 'RIFF' &&
+        bytes.toString('ascii', 8, 12) === 'WEBP';
+    default:
+      return false;
+  }
+}
+
 @Injectable()
 export class GeminiProvider implements AiProvider {
   readonly id = 'gemini' as const;
@@ -60,6 +76,9 @@ export class GeminiProvider implements AiProvider {
       const decoded = Buffer.from(image.dataBase64, 'base64');
       if (decoded.length === 0 || decoded.toString('base64') !== image.dataBase64) {
         throw new Error('Image data must be canonical base64');
+      }
+      if (!matchesImageSignature(image.mimeType, decoded)) {
+        throw new Error(`Image content does not match declared MIME type: ${image.mimeType}`);
       }
       totalBytes += decoded.length;
       if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
