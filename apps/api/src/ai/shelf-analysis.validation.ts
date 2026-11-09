@@ -6,6 +6,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isConfidence = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 
+const isNullableString = (value: unknown): value is string | null =>
+  value === null || typeof value === 'string';
+
+const isBoundingBox = (value: unknown): boolean => {
+  if (value === null) return true;
+  if (!isRecord(value)) return false;
+  const { x, y, width, height } = value;
+  return [x, y, width, height].every((part) => typeof part === 'number' && Number.isFinite(part)) &&
+    (x as number) >= 0 && (y as number) >= 0 &&
+    (width as number) > 0 && (height as number) > 0 &&
+    (x as number) + (width as number) <= 1 &&
+    (y as number) + (height as number) <= 1;
+};
+
 /** Validate the minimum domain invariants before a provider result can leave the AI boundary. */
 export function validateShelfAnalysisResult(
   value: unknown,
@@ -25,6 +39,9 @@ export function validateShelfAnalysisResult(
   }
 
   const allowedImageIds = new Set(expectedImageIds);
+  if (allowedImageIds.size !== expectedImageIds.length) {
+    throw new Error('Capture session contains duplicate image identifiers');
+  }
   const observations = value.observations.map((raw, index) => {
     if (!isRecord(raw)) throw new Error(`Invalid observation at index ${index}`);
     if (typeof raw.detectionId !== 'string' || !raw.detectionId) {
@@ -40,16 +57,26 @@ export function validateShelfAnalysisResult(
     if (!isConfidence(raw.identityConfidence)) {
       throw new Error(`Observation ${index} has invalid identity confidence`);
     }
+    if (!isNullableString(raw.candidateProductName) || !isNullableString(raw.brand) ||
+        !isNullableString(raw.packageDescription) || !isBoundingBox(raw.boundingBox)) {
+      throw new Error(`Observation ${index} has invalid product or bounding-box fields`);
+    }
     if (!Array.isArray(raw.reviewReasons) || !raw.reviewReasons.every((item) => typeof item === 'string')) {
       throw new Error(`Observation ${index} has invalid review reasons`);
     }
     return raw;
   });
 
-  const detectionIds = new Set(observations.map((item) => item.detectionId as string));
+  const detectionIdList = observations.map((item) => item.detectionId as string);
+  const detectionIds = new Set(detectionIdList);
+  if (detectionIds.size !== detectionIdList.length) {
+    throw new Error('AI provider returned duplicate detection identifiers');
+  }
   const crossViewMatches = value.crossViewMatches.map((raw, index) => {
     if (!isRecord(raw) || typeof raw.matchGroupId !== 'string' ||
-        !Array.isArray(raw.detectionIds) || !raw.detectionIds.every((id) => typeof id === 'string') ||
+        !Array.isArray(raw.detectionIds) || raw.detectionIds.length < 2 ||
+        !raw.detectionIds.every((id) => typeof id === 'string') ||
+        new Set(raw.detectionIds).size !== raw.detectionIds.length ||
         !isConfidence(raw.matchConfidence) || typeof raw.rationale !== 'string') {
       throw new Error(`Invalid cross-view match at index ${index}`);
     }
