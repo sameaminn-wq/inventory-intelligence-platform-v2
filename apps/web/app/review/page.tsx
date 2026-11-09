@@ -22,6 +22,7 @@ type Session = {
   status: string;
   result_json: { observations?: Observation[]; warnings?: string[] };
   created_at: string;
+  imageUrls?: Array<{ imageId: string; url: string }>;
 };
 type Review = { id: string; analysis_session_id: string; review_json: { observations?: Array<{ detectionId: string; verifiedQuantity: number | null; accepted: boolean; note?: string }> }; created_at: string };
 
