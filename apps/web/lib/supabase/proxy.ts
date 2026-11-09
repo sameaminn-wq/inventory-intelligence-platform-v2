@@ -19,8 +19,7 @@ export async function updateSession(request: NextRequest) {
   if (!url || !key) {
     if (
       pathname === '/login' ||
-      isPathOrChild(pathname, '/auth') ||
-      isPathOrChild(pathname, '/api')
+      isPathOrChild(pathname, '/auth')
     ) {
       return NextResponse.next({ request });
     }
@@ -50,8 +49,7 @@ export async function updateSession(request: NextRequest) {
   const claims = data?.claims;
   const isLogin = pathname === '/login';
   const isAuthRoute = isPathOrChild(pathname, '/auth');
-  const isApiRoute = isPathOrChild(pathname, '/api');
-  const isPublic = isLogin || isAuthRoute || isApiRoute;
+  const isPublic = isLogin || isAuthRoute;
 
   if (error || !claims) {
     if (!isPublic) {
