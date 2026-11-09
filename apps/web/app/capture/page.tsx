@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../components/app-shell';
 import { evaluateCaptureFrame } from '../../lib/capture-guidance.cjs';
+import { saveCaptureSession } from '../../lib/capture-session-store';
 
 type Metrics = { blur: number; glare: number; clipped: number; brightness: number };
 type Guidance = { action: string; message: string; reasons: string[] };
@@ -202,7 +203,7 @@ export default function CapturePage() {
     setError('');
   }
 
-  function continueToAnalysis() {
+  async function continueToAnalysis() {
     if (!captured.length || !sessionId) return;
     const manifest = {
       schemaVersion: 'capture-session-local-1.0',
@@ -220,7 +221,7 @@ export default function CapturePage() {
       })),
     };
     try {
-      window.sessionStorage.setItem('inventory.capture-session.v1', JSON.stringify(manifest));
+      await saveCaptureSession(manifest);
       router.push('/analysis');
     } catch {
       setError('تعذر تجهيز الجلسة للتحليل. صدّر الجلسة أولًا أو قلّل عدد الصور.');
