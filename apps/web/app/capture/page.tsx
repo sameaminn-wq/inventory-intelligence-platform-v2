@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../components/app-shell';
 import { evaluateCaptureFrame } from '../../lib/capture-guidance.cjs';
 
@@ -59,6 +60,7 @@ function measureFrame(canvas: HTMLCanvasElement): Metrics {
 
 
 export default function CapturePage() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraState, setCameraState] = useState('لم يتم تشغيل الكاميرا');
@@ -200,6 +202,31 @@ export default function CapturePage() {
     setError('');
   }
 
+  function continueToAnalysis() {
+    if (!captured.length || !sessionId) return;
+    const manifest = {
+      schemaVersion: 'capture-session-local-1.0',
+      captureSessionId: sessionId,
+      startedAt: sessionStartedAt,
+      savedAt: new Date().toISOString(),
+      frames: captured.map((frame) => ({
+        id: frame.id,
+        viewType: frame.viewType,
+        capturedAt: frame.capturedAt,
+        dataUrl: frame.dataUrl,
+        mimeType: 'image/jpeg',
+        metrics: frame.metrics,
+        overlap: frame.overlap,
+      })),
+    };
+    try {
+      window.sessionStorage.setItem('inventory.capture-session.v1', JSON.stringify(manifest));
+      router.push('/analysis');
+    } catch {
+      setError('تعذر تجهيز الجلسة للتحليل. صدّر الجلسة أولًا أو قلّل عدد الصور.');
+    }
+  }
+
   function exportSession() {
     if (!captured.length || !sessionId) return;
     const manifest = {
@@ -312,7 +339,7 @@ export default function CapturePage() {
         </section>
       </div>
       <section className="panel captured-panel">
-        <div className="section-head"><div><h2>جلسة التصوير ({captured.length}/{MAX_SESSION_IMAGES} صور)</h2><p className="panel-subtitle">{sessionId ? `معرّف الجلسة: ${sessionId}` : 'لم تبدأ جلسة بعد'}</p></div><div className="capture-session-actions"><button type="button" className="secondary-button" onClick={exportSession} disabled={!captured.length}>تصدير الصور وبيانات الجلسة</button><button type="button" className="text-button" onClick={startNewSession}>جلسة جديدة</button></div></div>
+        <div className="section-head"><div><h2>جلسة التصوير ({captured.length}/{MAX_SESSION_IMAGES} صور)</h2><p className="panel-subtitle">{sessionId ? `معرّف الجلسة: ${sessionId}` : 'لم تبدأ جلسة بعد'}</p></div><div className="capture-session-actions"><button type="button" className="primary-button" onClick={continueToAnalysis} disabled={!captured.length}>متابعة إلى التحليل</button><button type="button" className="secondary-button" onClick={exportSession} disabled={!captured.length}>تصدير الصور وبيانات الجلسة</button><button type="button" className="text-button" onClick={startNewSession}>جلسة جديدة</button></div></div>
         <p className="panel-subtitle">القبول فحص جودة أولي فقط. الصور محفوظة في ذاكرة الصفحة حتى التصدير أو بدء جلسة جديدة.</p>
         {captured.length === 0 ? <div className="empty-state"><h3>لم تلتقط صورًا بعد</h3><p>ابدأ بصورة واسعة للرف، ثم التقط الأجزاء المتجاورة.</p></div> : <div className="capture-thumbs">{captured.map((frame, index) => <figure key={frame.id}><img src={frame.dataUrl} alt={'صورة رف رقم ' + (index + 1)} /><figcaption>#{index + 1} · {frame.viewType === 'wide' ? 'واسعة' : frame.viewType === 'section' ? 'جزء رف' : 'زاوية إضافية'}{frame.overlap !== 'not_applicable' ? ` · التداخل: ${frame.overlap === 'low' ? 'قليل' : frame.overlap === 'high' ? 'كبير' : 'مناسب'}` : ''}</figcaption></figure>)}</div>}
         {captured.length > 0 && <div className="notice">الصور الواسعة: {captured.filter((frame) => frame.viewType === 'wide').length} · أجزاء الرف: {captured.filter((frame) => frame.viewType === 'section').length} · الزوايا الإضافية: {captured.filter((frame) => frame.viewType === 'alternate').length}. هذا سجل للصور الملتقطة فقط، وليس إثباتًا لاكتمال تغطية الرف.</div>}
