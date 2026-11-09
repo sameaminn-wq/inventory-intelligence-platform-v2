@@ -59,9 +59,17 @@ export async function GET(request: NextRequest) {
         .select('store_id,role,status,stores(id,name,slug,status)')
         .eq('user_id',ctx.userId).eq('status','active');
       if (error) return fail('تعذر تحميل عضوياتك.',503);
-      const stores = (data ?? []).filter(x => x.stores && x.stores.status === 'active').map(x => ({
-        id:x.store_id,name:x.stores.name,slug:x.stores.slug,role:x.role,status:x.status
-      }));
+      const stores = (data ?? []).flatMap(x => {
+        const relation = Array.isArray(x.stores) ? x.stores[0] : x.stores;
+        if (!relation || relation.status !== 'active') return [];
+        return [{
+          id: x.store_id,
+          name: relation.name,
+          slug: relation.slug,
+          role: x.role,
+          status: x.status,
+        }];
+      });
       return NextResponse.json({ isPlatformAdmin:false, stores });
     }
     const actorRole = await managerRole(ctx.supabase,storeId,ctx.userId);
