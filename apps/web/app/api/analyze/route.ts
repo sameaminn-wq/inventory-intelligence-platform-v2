@@ -214,6 +214,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
+      storeId: input.storeId,
       provider: 'gemini',
       model,
       note: 'AI estimates are suggestions only. Human verification is required before any inventory update.',
