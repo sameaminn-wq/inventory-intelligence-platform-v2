@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '../../lib/supabase/client';
 import type { ReactNode } from 'react';
 
 const navigation = [
@@ -23,6 +24,14 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function signOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace('/login');
+    router.refresh();
+  }
 
   return (
     <div className="app-shell" dir="rtl">
@@ -58,6 +67,7 @@ export function AppShell({
         <div className="sidebar-footer">
           <span className="status-dot" aria-hidden="true" />
           <span>نسخة تطويرية</span>
+          <button type="button" className="signout-button" onClick={signOut}>تسجيل الخروج</button>
         </div>
       </aside>
 
