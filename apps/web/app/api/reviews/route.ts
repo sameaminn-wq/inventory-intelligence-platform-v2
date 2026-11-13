@@ -65,21 +65,39 @@ export async function POST(request: NextRequest) {
 
   const source = session.result_json as Record<string, unknown>;
   const sourceObservations = Array.isArray(source.observations) ? source.observations : [];
+  if (sourceObservations.length === 0) {
+    return fail('لا توجد ملاحظات منتجات في هذه الجلسة لتسجيل مراجعتها.', 409);
+  }
+  if (body.observations.length !== sourceObservations.length) {
+    return fail('يجب مراجعة كل ملاحظات الجلسة مرة واحدة، حتى لو تركت بعض الكميات غير معروفة.', 400);
+  }
+
   const allowedIds = new Set(sourceObservations.flatMap(item =>
     item && typeof item === 'object' && typeof (item as Record<string, unknown>).detectionId === 'string'
       ? [(item as Record<string, unknown>).detectionId as string] : []
   ));
+  if (allowedIds.size !== sourceObservations.length) {
+    return fail('بيانات جلسة التحليل الأصلية تحتوي على معرّفات مكررة أو غير صالحة.', 409);
+  }
+
   const seen = new Set<string>();
   for (const raw of body.observations) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail('تحتوي المراجعة على ملاحظة غير صالحة.', 400);
     const row = raw as Record<string, unknown>;
+    const quantityIsKnown = row.verifiedQuantity !== null &&
+      Number.isInteger(row.verifiedQuantity) &&
+      (row.verifiedQuantity as number) >= 0 &&
+      (row.verifiedQuantity as number) <= 100000;
     if (typeof row.detectionId !== 'string' || !allowedIds.has(row.detectionId) || seen.has(row.detectionId) ||
-        !(row.verifiedQuantity === null || (Number.isInteger(row.verifiedQuantity) && (row.verifiedQuantity as number) >= 0 && (row.verifiedQuantity as number) <= 100000)) ||
-        typeof row.accepted !== 'boolean' ||
+        !(row.verifiedQuantity === null || quantityIsKnown) ||
+        typeof row.accepted !== 'boolean' || row.accepted !== quantityIsKnown ||
         (row.note !== undefined && (typeof row.note !== 'string' || row.note.length > 500))) {
       return fail('تحتوي المراجعة على كمية أو معرّف غير صالح.', 400);
     }
     seen.add(row.detectionId);
+  }
+  if (seen.size !== allowedIds.size) {
+    return fail('المراجعة لا تغطي جميع ملاحظات جلسة التحليل.', 400);
   }
 
   const reviewJson = {
