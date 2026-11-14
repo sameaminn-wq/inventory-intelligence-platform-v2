@@ -105,10 +105,11 @@ export async function POST(request: NextRequest) {
     observations: body.observations,
     note: 'هذه مراجعة بشرية موثقة؛ لا يتم تعديل رصيد المخزون تلقائياً.',
   };
-  const { data: savedReview, error: saveError } = await ctx.supabase.rpc('save_analysis_review', {
+  const { data: savedReviewData, error: saveError } = await ctx.supabase.rpc('save_analysis_review', {
     p_analysis_session_id: session.id,
     p_review_json: reviewJson,
   }).single();
+  const savedReview = savedReviewData as { review_id: string; created_at: string } | null;
   if (saveError || !savedReview) {
     console.error('Atomic analysis review save failed:', saveError?.code);
     return fail('تعذر حفظ المراجعة وتحديث حالة الجلسة بشكل ذري.', 503);
