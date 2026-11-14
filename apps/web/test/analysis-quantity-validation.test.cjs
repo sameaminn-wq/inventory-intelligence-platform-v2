@@ -14,7 +14,7 @@ test('analysis review accepts non-negative integer quantities only', () => {
     'analysis page must validate quantities with a digit-only regular expression',
   );
 
-  const quantityPattern = /^\\d+$/;
+  const quantityPattern = /^\d+$/;
   for (const value of ['0', '1', '25', '100000']) {
     assert.equal(quantityPattern.test(value), true);
   }
