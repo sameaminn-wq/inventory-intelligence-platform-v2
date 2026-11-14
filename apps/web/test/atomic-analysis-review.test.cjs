@@ -26,6 +26,9 @@ test('atomic review RPC locks the session and commits review plus status togethe
 test('atomic review RPC enforces complete source coverage and blocks direct status updates', () => {
   assert.match(migration, /Review must cover every source observation/);
   assert.match(migration, /unknown detection ID/);
+  assert.match(migration, /v_existing_review_json = p_review_json/);
+  assert.match(migration, /Analysis session already has a completed review/);
+  assert.ok(route.includes("saveError?.code === '23505'"));
   assert.match(migration, /jsonb_typeof\(v_item -> 'accepted'\) is distinct from 'boolean'/i);
   assert.match(migration, /jsonb_typeof\(v_item -> 'detectionId'\) is distinct from 'string'/i);
   assert.match(migration, /revoke update \(status, reviewed_at\)/i);
