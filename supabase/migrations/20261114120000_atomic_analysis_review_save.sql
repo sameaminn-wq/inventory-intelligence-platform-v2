@@ -125,6 +125,10 @@ begin
 
   if found then
     if v_existing_reviewer_id = v_user_id and v_existing_review_json = p_review_json then
+      update public.analysis_sessions
+      set status = 'reviewed',
+          reviewed_at = v_existing_created_at
+      where id = p_analysis_session_id;
       return query select v_existing_review_id, v_existing_created_at;
       return;
     end if;
