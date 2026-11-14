@@ -86,9 +86,6 @@ export default function AnalysisPage() {
           if (storeStillAuthorized) {
             setAnalysis(parsed);
             setSelectedStoreId(parsed.storeId);
-              item.detectionId,
-              item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
-            ])));
           } else {
             window.sessionStorage.removeItem(ANALYSIS_KEY);
           }
@@ -138,9 +135,6 @@ export default function AnalysisPage() {
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'فشل تحليل الصور.');
       const parsed = payload as Analysis;
       setAnalysis(parsed);
-        item.detectionId,
-        item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
-      ])));
       window.sessionStorage.setItem(ANALYSIS_KEY, JSON.stringify(parsed));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'حدث خطأ أثناء تحليل الصور.');
