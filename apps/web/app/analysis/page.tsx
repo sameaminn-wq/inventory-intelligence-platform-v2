@@ -159,7 +159,7 @@ export default function AnalysisPage() {
     if (!analysis) return;
     const hasInvalidQuantity = analysis.observations.some((item) => {
       const value = quantities[item.detectionId] ?? '';
-      return value !== '' && (!/^\\d+$/.test(value) || Number(value) > MAX_REVIEW_QUANTITY);
+      return value !== '' && (!/^\d+$/.test(value) || Number(value) > MAX_REVIEW_QUANTITY);
     });
     if (hasInvalidQuantity) {
       setError('راجع الكميات المدخلة: يجب أن تكون أعدادًا صحيحة من صفر إلى 100,000.');
