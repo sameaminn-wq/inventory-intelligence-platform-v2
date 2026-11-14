@@ -34,4 +34,7 @@ test('atomic review RPC enforces complete source coverage and blocks direct stat
   assert.match(migration, /jsonb_typeof\(v_item -> 'detectionId'\) is distinct from 'string'/i);
   assert.match(migration, /revoke update \(status, reviewed_at\)/i);
   assert.match(migration, /drop policy if exists "active members can mark sessions reviewed"/i);
+  assert.match(migration, /create unique index if not exists analysis_reviews_one_per_session_idx/i);
+  assert.match(migration, /revoke insert on public\\.analysis_reviews from authenticated/i);
+  assert.match(migration, /is distinct from 'human-review-1\\.0'/i);
 });
