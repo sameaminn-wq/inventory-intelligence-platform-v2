@@ -1,3 +1,22 @@
+do $migration$
+begin
+  if exists (
+    select 1
+    from public.analysis_reviews
+    group by analysis_session_id
+    having count(*) > 1
+  ) then
+    raise exception 'Cannot enforce one review per analysis session: duplicate reviews already exist';
+  end if;
+end;
+$migration$;
+
+create unique index if not exists analysis_reviews_one_per_session_idx
+  on public.analysis_reviews (analysis_session_id);
+
+revoke insert on public.analysis_reviews from authenticated;
+drop policy if exists "active members can save own analysis reviews" on public.analysis_reviews;
+
 create or replace function public.save_analysis_review(
   p_analysis_session_id uuid,
   p_review_json jsonb
@@ -33,7 +52,7 @@ begin
   if p_analysis_session_id is null
      or p_review_json is null
      or jsonb_typeof(p_review_json) <> 'object'
-     or p_review_json ->> 'schemaVersion' <> 'human-review-1.0'
+     or p_review_json ->> 'schemaVersion' is distinct from 'human-review-1.0'
      or case
           when jsonb_typeof(p_review_json -> 'observations') = 'array'
           then jsonb_array_length(p_review_json -> 'observations') not between 1 and 200
