@@ -20,6 +20,10 @@ declare
   v_review_count integer;
   v_quantity numeric;
   v_quantity_known boolean;
+  v_existing_review_id uuid;
+  v_existing_reviewer_id uuid;
+  v_existing_review_json jsonb;
+  v_existing_created_at timestamptz;
 begin
   v_user_id := auth.uid();
   if v_user_id is null then
@@ -110,6 +114,22 @@ begin
      (select count(distinct source_item ->> 'detectionId')
       from jsonb_array_elements(v_source_observations) source_item) <> v_source_count then
     raise exception 'Source observation IDs are duplicated or invalid' using errcode = '22023';
+  end if;
+
+  select r.id, r.reviewer_id, r.review_json, r.created_at
+    into v_existing_review_id, v_existing_reviewer_id, v_existing_review_json, v_existing_created_at
+  from public.analysis_reviews r
+  where r.analysis_session_id = p_analysis_session_id
+  order by r.created_at asc
+  limit 1;
+
+  if found then
+    if v_existing_reviewer_id = v_user_id and v_existing_review_json = p_review_json then
+      return query select v_existing_review_id, v_existing_created_at;
+      return;
+    end if;
+    raise exception 'Analysis session already has a completed review'
+      using errcode = '23505';
   end if;
 
   insert into public.analysis_reviews (
