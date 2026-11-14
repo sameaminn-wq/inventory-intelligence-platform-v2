@@ -2,8 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 function normalizePathname(pathname: string): string {
-  // Next.js trailingSlash=true can present /login/ to middleware. Compare
-  // canonical paths so the login page cannot redirect to itself forever.
+  // Keep route classification stable when Next.js supplies trailing slashes.
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
 }
 
