@@ -27,7 +27,7 @@ test('atomic review RPC enforces complete source coverage and blocks direct stat
   assert.match(migration, /Review must cover every source observation/);
   assert.match(migration, /unknown detection ID/);
   assert.match(migration, /v_existing_review_json = p_review_json/);
-  assert.match(migration, /set status = 'reviewed',[\\s\\S]*?reviewed_at = v_existing_created_at/);
+  assert.ok(migration.includes("set status = 'reviewed',\n          reviewed_at = v_existing_created_at"));
   assert.match(migration, /Analysis session already has a completed review/);
   assert.ok(route.includes("saveError?.code === '23505'"));
   assert.match(migration, /jsonb_typeof\(v_item -> 'accepted'\) is distinct from 'boolean'/i);
