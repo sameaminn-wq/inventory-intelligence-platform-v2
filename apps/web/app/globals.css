@@ -202,3 +202,19 @@ button:focus-visible, a:focus-visible { outline:3px solid #80b99a; outline-offse
 .team-table td{vertical-align:middle}
 .team-table select{min-width:130px}
 @media(max-width:680px){.team-form,.team-form.invite-form{grid-template-columns:1fr}.team-form button{width:100%}.team-section .section-head{flex-direction:row;align-items:center}}
+
+
+/* Platform owner dashboard */
+.platform-admin{min-height:100vh;max-width:1440px;margin:0 auto;padding:36px;color:var(--ink)}
+.platform-admin-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:28px}
+.platform-admin-header h1{margin:0;font-size:clamp(26px,3vw,34px)}
+.platform-admin-header p{margin:9px 0 0;color:var(--muted);line-height:1.8}
+.platform-admin-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
+.platform-admin-toolbar p{margin:0;color:var(--muted);font-size:12px;line-height:1.8}
+.platform-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.platform-stat-value{display:block;margin-top:16px;font-size:27px;color:var(--ink)}
+.platform-store-panel{margin-top:16px}
+.platform-store-table{min-width:720px}
+.platform-store-slug{display:block;margin-top:5px;color:var(--muted);font-size:10px;text-align:right}
+@media(max-width:850px){.platform-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.platform-admin{padding:24px 14px}.platform-admin-header,.platform-admin-toolbar{align-items:stretch;flex-direction:column}.platform-admin-header .secondary-button{align-self:flex-start}.platform-stat-grid{gap:9px}.platform-stat-value{font-size:22px}}

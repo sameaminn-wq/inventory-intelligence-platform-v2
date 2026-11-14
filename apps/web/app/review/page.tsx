@@ -148,12 +148,11 @@ export default function ReviewPage() {
               <p>الكمية المرئية المقدرة: <b>{item.estimatedVisibleQuantity ?? 'غير معروفة'}</b></p>
               {item.reviewReasons?.length ? <p className="panel-subtitle">أسباب المراجعة: {item.reviewReasons.join('، ')}</p> : null}
               <label>الكمية التي تحققت منها فعلياً
-                <input type="number" min="0" max="100000" step="1" value={quantities[session.id + ':' + item.detectionId] ?? ''} onChange={e=>setQuantities(current=>({...current,[session.id + ':' + item.detectionId]:e.target.value}))} placeholder="أدخل الكمية أو اتركها فارغة" />
+                <input type="number" min="0" max="100000" step="1" value={quantities[session.id + ':' + item.detectionId] ?? ''} disabled={Boolean(latest)} onChange={e=>setQuantities(current=>({...current,[session.id + ':' + item.detectionId]:e.target.value}))} placeholder="أدخل الكمية أو اتركها فارغة" />
               </label>
               <span className="panel-subtitle">{reviewedIds.has(item.detectionId)?'تم التحقق من هذه الملاحظة في آخر مراجعة':'لم يتم اعتماد كمية بشرية لهذه الملاحظة بعد'}</span>
             </div>)}
-            {latest && <p className="capture-feedback good">آخر مراجعة محفوظة: {new Date(latest.created_at).toLocaleString('ar-EG')}</p>}
-            {observations.length > 0 && <button className="primary-button" type="button" disabled={savingId===session.id || savingId!==''} onClick={()=>void saveReview(session)}>{savingId===session.id?'جارٍ حفظ المراجعة…':'حفظ المراجعة البشرية'}</button>}
+            {latest ? <p className="capture-feedback good">اكتملت المراجعة ولا يمكن تعديلها في هذه النسخة. تاريخ الحفظ: {new Date(latest.created_at).toLocaleString('ar-EG')}</p> : observations.length > 0 ? <button className="primary-button" type="button" disabled={savingId===session.id || savingId!==''} onClick={()=>void saveReview(session)}>{savingId===session.id?'جارٍ حفظ المراجعة…':'حفظ المراجعة البشرية'}</button> : null}
           </article>;
         })}</div>}
     </section>

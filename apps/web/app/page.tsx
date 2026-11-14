@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { AppShell } from './components/app-shell';
 import { createClient } from '../lib/supabase/server';
 
@@ -7,37 +8,37 @@ export default async function HomePage() {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;
-  let stats = { products: 0, units: 0, sessions: 0, pending: 0 };
-  let dataError = '';
+  if (typeof userId !== 'string') redirect('/login/');
 
-  if (typeof userId === 'string') {
-    const { data: memberships, error: membershipError } = await supabase
-      .from('store_memberships').select('store_id')
-      .eq('user_id', userId).eq('status', 'active');
-    if (membershipError) dataError = 'تعذر تحميل عضويات المتاجر.';
-    else {
-      const storeIds = [...new Set((memberships ?? []).map(x => x.store_id))];
-      if (storeIds.length) {
-        const [productsResult, sessionsResult] = await Promise.all([
-          supabase.from('products').select('id,quantity_on_hand').in('store_id', storeIds),
-          supabase.from('analysis_sessions').select('id,status').in('store_id', storeIds),
-        ]);
-        if (productsResult.error || sessionsResult.error) {
-          dataError = 'تعذر تحميل إحصاءات المخزون. تحقق من إعدادات Data API وصلاحيات Supabase.';
-        } else {
-          const products = productsResult.data ?? [];
-          const sessions = sessionsResult.data ?? [];
-          stats = {
-            products: products.length,
-            units: products.reduce((sum, item) => sum + Number(item.quantity_on_hand ?? 0), 0),
-            sessions: sessions.length,
-            pending: sessions.filter(item => item.status === 'pending_review').length,
-          };
-        }
-      }
-    }
+  const { data: memberships, error: membershipError } = await supabase
+    .from('store_memberships')
+    .select('store_id')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  if (membershipError) {
+    return <AppShell title="تعذر تحميل مساحة العمل" description="لم نتمكن من التحقق من متاجرك. حاول مرة أخرى أو تواصل مع الدعم.">
+      <section className="panel"><p className="error-message" role="alert">تعذر تحميل عضويات المتاجر. لم نعرض بيانات غير مؤكدة.</p></section>
+    </AppShell>;
   }
+  if (!memberships?.length) redirect('/stores/');
 
+  const storeIds = [...new Set(memberships.map(item => item.store_id))];
+  const [productsResult, sessionsResult] = await Promise.all([
+    supabase.from('products').select('id,quantity_on_hand').in('store_id', storeIds),
+    supabase.from('analysis_sessions').select('id,status').in('store_id', storeIds),
+  ]);
+  const dataError = productsResult.error || sessionsResult.error
+    ? 'تعذر تحميل إحصاءات المخزون. تحقق من إعدادات Data API وصلاحيات Supabase.'
+    : '';
+  const products = productsResult.data ?? [];
+  const sessions = sessionsResult.data ?? [];
+  const stats = {
+    products: products.length,
+    units: products.reduce((sum, item) => sum + Number(item.quantity_on_hand ?? 0), 0),
+    sessions: sessions.length,
+    pending: sessions.filter(item => item.status === 'pending_review').length,
+  };
   const cards = [
     { label: 'المنتجات المسجلة', value: stats.products.toLocaleString('ar-EG'), note: 'منتجات في المتاجر التي تملك صلاحية الوصول إليها' },
     { label: 'إجمالي وحدات المخزون', value: stats.units.toLocaleString('ar-EG'), note: 'مجموع الأرصدة الحالية للمنتجات' },
@@ -59,11 +60,11 @@ export default async function HomePage() {
         <section className="panel">
           <h2>حالة العمل</h2>
           <p className="panel-subtitle">الإحصاءات أعلاه مأخوذة مباشرة من قاعدة البيانات وبحسب صلاحيات حسابك.</p>
-          {userId ? <div className="empty-state">
+          <div className="empty-state">
             <div className="empty-icon" aria-hidden="true">⌁</div>
             <h3>لوحة المتجر متصلة</h3>
             <p>يمكنك متابعة المنتجات والأرصدة وجلسات التحليل والمراجعات من الاختصارات.</p>
-          </div> : <div className="empty-state"><h3>سجّل الدخول للمتابعة</h3><a className="primary-button" href="/login/">تسجيل الدخول</a></div>}
+          </div>
         </section>
         <section className="panel">
           <h2>اختصارات العمل</h2>

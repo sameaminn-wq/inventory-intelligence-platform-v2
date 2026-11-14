@@ -3,22 +3,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const analysisSource = fs.readFileSync(
-  path.join(__dirname, '../app/analysis/page.tsx'),
-  'utf8',
-);
+const reviewSource = fs.readFileSync(path.join(__dirname, '../app/review/page.tsx'), 'utf8');
+const reviewApi = fs.readFileSync(path.join(__dirname, '../app/api/reviews/route.ts'), 'utf8');
 
-test('analysis review accepts non-negative integer quantities only', () => {
-  assert.ok(
-    analysisSource.includes('!/^\\d+$/.test(value)'),
-    'analysis page must validate quantities with a digit-only regular expression',
-  );
+test('human review accepts non-negative integer quantities only', () => {
+  assert.ok(reviewApi.includes('Number.isInteger(row.verifiedQuantity)'));
+  assert.ok(reviewApi.includes('(row.verifiedQuantity as number) >= 0'));
+  assert.ok(reviewApi.includes('(row.verifiedQuantity as number) <= 100000'));
+  const valid = value => value === null || (Number.isInteger(value) && value >= 0 && value <= 100000);
+  for (const value of [null, 0, 1, 25, 100000]) assert.equal(valid(value), true);
+  for (const value of [-1, 1.5, 100001, '2', NaN]) assert.equal(valid(value), false);
+});
 
-  const quantityPattern = /^\d+$/;
-  for (const value of ['0', '1', '25', '100000']) {
-    assert.equal(quantityPattern.test(value), true);
-  }
-  for (const value of ['', '-1', '1.5', '1a', ' 2']) {
-    assert.equal(quantityPattern.test(value), false);
-  }
+test('a completed immutable review locks its quantity inputs and hides the save action', () => {
+  assert.ok(reviewSource.includes('disabled={Boolean(latest)}'));
+  assert.ok(reviewSource.includes('اكتملت المراجعة ولا يمكن تعديلها في هذه النسخة'));
+  assert.ok(reviewSource.includes('latest ? <p className="capture-feedback good">'));
 });
