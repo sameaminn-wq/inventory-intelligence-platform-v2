@@ -51,14 +51,14 @@ begin
 
   if p_analysis_session_id is null
      or p_review_json is null
-     or jsonb_typeof(p_review_json) <> 'object'
+     or jsonb_typeof(p_review_json) is distinct from 'object'
      or p_review_json ->> 'schemaVersion' is distinct from 'human-review-1.0'
-     or case
-          when jsonb_typeof(p_review_json -> 'observations') = 'array'
-          then jsonb_array_length(p_review_json -> 'observations') not between 1 and 200
-          else true
-        end then
+     or jsonb_typeof(p_review_json -> 'observations') is distinct from 'array' then
     raise exception 'Invalid analysis review payload' using errcode = '22023';
+  end if;
+
+  if jsonb_array_length(p_review_json -> 'observations') not between 1 and 200 then
+    raise exception 'Invalid analysis review observation count' using errcode = '22023';
   end if;
 
   select s.store_id, s.result_json -> 'observations'
@@ -82,7 +82,7 @@ begin
     raise exception 'Insufficient store permissions' using errcode = '42501';
   end if;
 
-  if jsonb_typeof(v_source_observations) <> 'array' then
+  if jsonb_typeof(v_source_observations) is distinct from 'array' then
     raise exception 'Source observations are invalid' using errcode = '22023';
   end if;
 
