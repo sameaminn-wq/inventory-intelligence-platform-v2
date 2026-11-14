@@ -31,7 +31,6 @@ type Analysis = {
 
 const ANALYSIS_KEY = 'inventory.analysis-result.v1';
 const MAX_UPLOAD_BYTES = 2.8 * 1024 * 1024;
-const MAX_REVIEW_QUANTITY = 100000;
 
 async function compressForVercel(dataUrl: string): Promise<string> {
   const image = new Image();
@@ -56,10 +55,8 @@ export default function AnalysisPage() {
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [storesLoading, setStoresLoading] = useState(true);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [saved, setSaved] = useState(false);
   const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -89,7 +86,6 @@ export default function AnalysisPage() {
           if (storeStillAuthorized) {
             setAnalysis(parsed);
             setSelectedStoreId(parsed.storeId);
-            setQuantities(Object.fromEntries(parsed.observations.map((item) => [
               item.detectionId,
               item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
             ])));
@@ -143,7 +139,6 @@ export default function AnalysisPage() {
       if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'فشل تحليل الصور.');
       const parsed = payload as Analysis;
       setAnalysis(parsed);
-      setQuantities(Object.fromEntries(parsed.observations.map((item) => [
         item.detectionId,
         item.estimatedVisibleQuantity === null ? '' : String(item.estimatedVisibleQuantity),
       ])));
@@ -155,57 +150,6 @@ export default function AnalysisPage() {
     }
   }
 
-  async function saveHumanReview() {
-    if (!analysis) return;
-    const hasInvalidQuantity = analysis.observations.some((item) => {
-      const value = quantities[item.detectionId] ?? '';
-      return value !== '' && (!/^\d+$/.test(value) || Number(value) > MAX_REVIEW_QUANTITY);
-    });
-    if (hasInvalidQuantity) {
-      setError('راجع الكميات المدخلة: يجب أن تكون أعدادًا صحيحة من صفر إلى 100,000.');
-      return;
-    }
-    const review = {
-      schemaVersion: 'human-review-local-1.0',
-      captureSessionId: analysis.captureSessionId,
-      storeId: analysis.storeId,
-      reviewedAt: new Date().toISOString(),
-      inventoryUpdated: false,
-      observations: analysis.observations.map((item) => ({
-        detectionId: item.detectionId,
-        sourceImageId: item.sourceImageId,
-        candidateProductName: item.candidateProductName,
-        aiEstimatedVisibleQuantity: item.estimatedVisibleQuantity,
-        humanVerifiedVisibleQuantity: quantities[item.detectionId] === '' ? null : Number(quantities[item.detectionId]),
-        identityConfidence: item.identityConfidence,
-        reviewReasons: item.reviewReasons,
-      })),
-      note: 'Human review draft only. No inventory database was changed.',
-    };
-    try {
-      const response = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          analysisSessionId: analysis.analysisSessionId,
-          observations: review.observations.map((item) => ({
-            detectionId: item.detectionId,
-            verifiedQuantity: item.humanVerifiedVisibleQuantity,
-            accepted: item.humanVerifiedVisibleQuantity !== null,
-            note: item.reviewReasons.join('، ').slice(0, 500),
-          })),
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'تعذر حفظ المراجعة.');
-      window.sessionStorage.setItem('inventory.human-review.v1', JSON.stringify({
-        ...review, persistedReviewId: payload.reviewId, persistedAt: payload.createdAt,
-      }));
-      setSaved(true);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'تعذر حفظ المراجعة بشكل دائم.');
-    }
-  }
 
   return (
     <AppShell title="تحليل الرف" description="حلّل صور الجلسة على خادم Vercel، ثم راجع اقتراحات الذكاء الاصطناعي قبل أي اعتماد.">
@@ -252,7 +196,6 @@ export default function AnalysisPage() {
               <div className="metric-list">
                 <span>الكمية المرئية المقدرة بواسطة AI: <b>{item.estimatedVisibleQuantity === null ? 'غير معروفة' : item.estimatedVisibleQuantity}</b></span>
                 <label>الكمية المرئية التي تحققت منها
-                  <input type="number" min="0" max={MAX_REVIEW_QUANTITY} step="1" inputMode="numeric" value={quantities[item.detectionId] ?? ''} onChange={(event) => setQuantities((current) => ({ ...current, [item.detectionId]: event.target.value }))} placeholder="أدخل العدد بعد المراجعة" />
                 </label>
               </div>
               {item.reviewReasons.length > 0 && <p className="notice">أسباب المراجعة: {item.reviewReasons.join('، ')}</p>}
@@ -260,8 +203,7 @@ export default function AnalysisPage() {
           ))}
         </div>
         {analysis.observations.length > 0 && <div className="capture-session-actions">
-          <button className="primary-button" type="button" onClick={saveHumanReview}>حفظ المراجعة البشرية</button>
-          {saved && <span className="panel-subtitle" role="status">تم حفظ المراجعة بشكل دائم في قاعدة البيانات.</span>}
+          <a className="primary-button" href="/review/">الانتقال إلى المراجعة البشرية</a>
         </div>}
         <div className="notice">{analysis.note} لا يتم تحديث المخزون من هذه الصفحة؛ الكميات المرئية المقدرة منفصلة عن الكميات التي تحقق منها الموظف.</div>
       </section>}
