@@ -9,15 +9,11 @@ const proxySource = fs.readFileSync(
 );
 
 test('normalizes trailing slashes before classifying routes', () => {
-  const normalizationLine = proxySource
-    .split('\n')
-    .find((line) => line.includes('const pathname ='));
-  assert.equal(
-    normalizationLine?.trim(),
-    String.raw`const pathname = request.nextUrl.pathname.replace(/\/+$/, '') || '/';`,
-  );
+  assert.ok(proxySource.includes('function normalizePathname'));
+  assert.ok(proxySource.includes('const pathname = normalizePathname(request.nextUrl.pathname)'));
 
-  const normalizePathname = (pathname) => pathname.replace(/\/+$/, '') || '/';
+  const normalizePathname = (pathname) =>
+    pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
   assert.equal(normalizePathname('/login/'), '/login');
   assert.equal(normalizePathname('/login'), '/login');
   assert.equal(normalizePathname('/auth/callback/'), '/auth/callback');
@@ -26,14 +22,14 @@ test('normalizes trailing slashes before classifying routes', () => {
   assert.equal(normalizePathname('/'), '/');
 });
 
-test('keeps login, auth, and API routes public after path normalization', () => {
-  assert.match(proxySource, /const isLogin = pathname === '\/login' \|\| pathname\.startsWith\('\/auth\/'\)/);
-  assert.match(proxySource, /const isApi = pathname\.startsWith\('\/api\/'\)/);
+test('keeps login and auth routes public while requiring claims for API routes', () => {
+  assert.ok(proxySource.includes("const isLogin = pathname === '/login';"));
+  assert.ok(proxySource.includes("const isAuthRoute = isPathOrChild(pathname, '/auth');"));
+  assert.ok(proxySource.includes('const isPublic = isLogin || isAuthRoute;'));
+  assert.ok(proxySource.includes('if (!isPublic)'));
 });
 
-test('keeps protected routes behind the existing claims check', () => {
-  assert.match(proxySource, /const isProtected = !isPublic/);
-  assert.match(proxySource, /if \(error \|\| !claims\)/);
-  assert.match(proxySource, /if \(isProtected\)/);
-  assert.match(proxySource, /if \(isLogin\)/);
+test('keeps protected routes behind the claims check', () => {
+  assert.ok(proxySource.includes('if (error || !claims)'));
+  assert.ok(proxySource.includes('if (isLogin)'));
 });

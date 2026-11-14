@@ -135,3 +135,42 @@ test('rejects duplicate image identifiers in the trusted request context', () =>
     'test-model',
   ), /duplicate image identifiers/);
 });
+
+
+test('rejects model output with too many observations', () => {
+  const payload = validPayload();
+  payload.observations = Array.from({ length: 501 }, (_, index) => ({
+    ...payload.observations[0],
+    detectionId: 'd-' + index,
+  }));
+  assert.throws(() => validate(payload), /exceeds observation or cross-view match limits/);
+});
+
+test('rejects duplicate cross-view match group identifiers', () => {
+  const payload = validPayload();
+  payload.observations.push({
+    ...payload.observations[1],
+    detectionId: 'detection-d',
+    sourceImageId: 'image-b',
+  });
+  payload.unmatchedDetectionIds = [];
+  payload.crossViewMatches.push({
+    matchGroupId: payload.crossViewMatches[0].matchGroupId,
+    detectionIds: ['detection-c', 'detection-d'],
+    matchConfidence: 0.7,
+    rationale: 'A separate cross-view pair',
+  });
+  assert.throws(() => validate(payload), /Invalid cross-view match at index 1/);
+});
+
+test('rejects excessively long model-generated warning strings', () => {
+  const payload = validPayload();
+  payload.warnings = ['x'.repeat(501)];
+  assert.throws(() => validate(payload), /invalid review metadata/);
+});
+
+test('rejects excessively long product descriptions from model output', () => {
+  const payload = validPayload();
+  payload.observations[0].packageDescription = 'x'.repeat(301);
+  assert.throws(() => validate(payload), /invalid product or bounding-box fields/);
+});

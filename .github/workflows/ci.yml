@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'fix/**']
   push:
-    branches: [main, 'bootstrap/**', 'phase-1/**', 'architecture/**']
+    branches: [main, 'bootstrap/**', 'phase-1/**', 'architecture/**', 'fix/**']
 
 permissions:
   contents: read

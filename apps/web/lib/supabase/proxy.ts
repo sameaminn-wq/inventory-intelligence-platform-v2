@@ -1,14 +1,28 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+function normalizePathname(pathname: string): string {
+  // Keep route classification stable when Next.js supplies trailing slashes.
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+}
+
+function isPathOrChild(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(base + '/');
+}
+
 export async function updateSession(request: NextRequest) {
-  const pathname = request.nextUrl.pathname.replace(/\/+$/, '') || '/';
+  const pathname = normalizePathname(request.nextUrl.pathname);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
   if (!url || !key) {
-    if (pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/api/')) {
+    if (
+      pathname === '/login' ||
+      isPathOrChild(pathname, '/auth')
+    ) {
       return NextResponse.next({ request });
     }
+
     const destination = request.nextUrl.clone();
     destination.pathname = '/login';
     destination.search = '';
@@ -32,15 +46,15 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
-  const isLogin = pathname === '/login' || pathname.startsWith('/auth/');
-  const isApi = pathname.startsWith('/api/');
-  const isPublic = isLogin || isApi;
-  const isProtected = !isPublic;
+  const isLogin = pathname === '/login';
+  const isAuthRoute = isPathOrChild(pathname, '/auth');
+  const isPublic = isLogin || isAuthRoute;
 
   if (error || !claims) {
-    if (isProtected) {
+    if (!isPublic) {
       const destination = request.nextUrl.clone();
       destination.pathname = '/login';
+      destination.search = '';
       destination.searchParams.set('next', request.nextUrl.pathname);
       return NextResponse.redirect(destination);
     }

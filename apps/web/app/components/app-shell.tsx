@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 const navigation = [
   { href: '/', label: 'الرئيسية', icon: '⌂' },
+  { href: '/stores/', label: 'المتاجر', icon: '▦' },
   { href: '/inventory/', label: 'المخزون', icon: '▤' },
   { href: '/capture/', label: 'تصوير الرفوف', icon: '▣' },
   { href: '/analysis/', label: 'تحليل الرف', icon: '⌁' },
