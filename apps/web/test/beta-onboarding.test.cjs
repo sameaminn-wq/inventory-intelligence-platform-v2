@@ -36,7 +36,9 @@ test('new accounts without a store are sent to onboarding and existing members t
 test('every analysis attempt receives a unique private storage prefix', () => {
   assert.ok(analyze.includes('const analysisAttemptId = randomUUID();'));
   assert.ok(analyze.includes('${input.captureSessionId}/${analysisAttemptId}/${image.imageId}.jpg'));
-  assert.ok(analyze.includes('cleanup after exception failed'));
+  assert.ok(analyze.includes('async function cleanupUploadedAssets(paths: string[])'));
+  assert.ok(analyze.includes('createAdminClient()'));
+  assert.ok(analyze.includes('await cleanupUploadedAssets(imageAssets.map((asset) => asset.path));'));
 });
 
 test('human verification is centralized in the review workspace', () => {
