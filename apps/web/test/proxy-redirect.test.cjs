@@ -24,12 +24,13 @@ test('normalizes trailing slashes before classifying routes', () => {
 
 test('keeps login and auth routes public while requiring claims for API routes', () => {
   assert.ok(proxySource.includes("const isLogin = pathname === '/login';"));
+  assert.ok(proxySource.includes("const isSignup = pathname === '/signup';"));
   assert.ok(proxySource.includes("const isAuthRoute = isPathOrChild(pathname, '/auth');"));
-  assert.ok(proxySource.includes('const isPublic = isLogin || isAuthRoute;'));
+  assert.ok(proxySource.includes('const isPublic = isLogin || isSignup || isAuthRoute;'));
   assert.ok(proxySource.includes('if (!isPublic)'));
 });
 
 test('keeps protected routes behind the claims check', () => {
   assert.ok(proxySource.includes('if (error || !claims)'));
-  assert.ok(proxySource.includes('if (isLogin)'));
+  assert.ok(proxySource.includes('if (isLogin || isSignup)'));
 });
