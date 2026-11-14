@@ -119,8 +119,19 @@ export async function POST(request: NextRequest) {
       const {data:store,error} = await admin.from('stores').insert({name:input.name.trim(),slug,created_by:ctx.userId}).select('id,name,slug').single();
       if (error) return fail(error.code==='23505'?'معرّف المتجر مستخدم بالفعل.':'تعذر إنشاء المتجر.',503);
       const {error:memberError} = await admin.from('store_memberships').insert({store_id:store.id,user_id:ctx.userId,role:'owner',status:'active'});
-      if (memberError) { await admin.from('stores').delete().eq('id',store.id); return fail('تعذر إنشاء عضوية مالك المتجر.',503); }
-      await writeAudit(admin,{store_id:store.id,actor_user_id:ctx.userId,target_user_id:ctx.userId,action:'membership_added',new_role:'owner',new_status:'active'});
+      if (memberError) {
+        const {error:rollbackError} = await admin.from('stores').delete().eq('id',store.id);
+        if (rollbackError) console.error('Store creation rollback failed:', rollbackError.code);
+        return fail('تعذر إنشاء عضوية مالك المتجر. لم تكتمل عملية الإنشاء.',503);
+      }
+      try {
+        await writeAudit(admin,{store_id:store.id,actor_user_id:ctx.userId,target_user_id:ctx.userId,action:'membership_added',new_role:'owner',new_status:'active'});
+      } catch {
+        const {error:membershipRollbackError} = await admin.from('store_memberships').delete().eq('store_id',store.id).eq('user_id',ctx.userId);
+        const {error:storeRollbackError} = await admin.from('stores').delete().eq('id',store.id);
+        if (membershipRollbackError || storeRollbackError) console.error('Store audit rollback incomplete:', membershipRollbackError?.code, storeRollbackError?.code);
+        return fail('تعذر تسجيل إنشاء المتجر في سجل التدقيق؛ تم إلغاء الإنشاء إن أمكن.',503);
+      }
       return NextResponse.json({store},{status:201});
     }
     if (input.action !== 'invite_member' || typeof input.storeId!=='string' || typeof input.email!=='string' ||
@@ -147,12 +158,27 @@ export async function POST(request: NextRequest) {
     const role = input.role as Role;
     const {error:insertError} = await admin.from('store_memberships').insert({store_id:input.storeId,user_id:targetId,role,status});
     if (insertError) {
-      if (invited) await admin.auth.admin.deleteUser(targetId);
+      if (invited) {
+        const {error:deleteUserError} = await admin.auth.admin.deleteUser(targetId);
+        if (deleteUserError) console.error('Invite user cleanup failed:', deleteUserError.code);
+      }
       invitedUserId = null;
       return fail('تعذر إضافة العضوية.',503);
     }
+    try {
+      await writeAudit(admin,{store_id:input.storeId,actor_user_id:ctx.userId,target_user_id:targetId,action:invited?'invited':'membership_added',new_role:role,new_status:status});
+    } catch {
+      const {error:membershipRollbackError} = await admin.from('store_memberships').delete()
+        .eq('store_id',input.storeId).eq('user_id',targetId);
+      if (membershipRollbackError) console.error('Membership audit rollback failed:', membershipRollbackError.code);
+      if (invited) {
+        const {error:deleteUserError} = await admin.auth.admin.deleteUser(targetId);
+        if (deleteUserError) console.error('Invite audit rollback user cleanup failed:', deleteUserError.code);
+      }
+      invitedUserId = null;
+      return fail('تعذر تسجيل العضوية في سجل التدقيق؛ تم إلغاء الإضافة إن أمكن.',503);
+    }
     invitedUserId = null;
-    await writeAudit(admin,{store_id:input.storeId,actor_user_id:ctx.userId,target_user_id:targetId,action:invited?'invited':'membership_added',new_role:role,new_status:status});
     return NextResponse.json({email,role,status,invited},{status:201});
   } catch {
     if (invitedUserId) {
@@ -192,11 +218,19 @@ export async function PATCH(request: NextRequest) {
     } else return fail('حدد الدور أو الحالة الجديدة.',400);
     const {error:updateError} = await admin.from('store_memberships').update({...patch,updated_at:new Date().toISOString()}).eq('id',target.id);
     if (updateError) return fail('تعذر تحديث العضوية.',503);
-    await writeAudit(admin,{
-      store_id:input.storeId,actor_user_id:ctx.userId,target_user_id:target.user_id,action,
-      previous_role:target.role as Role,new_role:patch.role ?? target.role as Role,
-      previous_status:target.status as Status,new_status:patch.status ?? target.status as Status
-    });
+    try {
+      await writeAudit(admin,{
+        store_id:input.storeId,actor_user_id:ctx.userId,target_user_id:target.user_id,action,
+        previous_role:target.role as Role,new_role:patch.role ?? target.role as Role,
+        previous_status:target.status as Status,new_status:patch.status ?? target.status as Status
+      });
+    } catch {
+      const {error:rollbackError} = await admin.from('store_memberships')
+        .update({role:target.role,status:target.status,updated_at:new Date().toISOString()})
+        .eq('id',target.id).eq('store_id',input.storeId);
+      if (rollbackError) console.error('Membership update audit rollback failed:', rollbackError.code);
+      return fail('تعذر تسجيل التغيير في سجل التدقيق؛ تمت محاولة إعادة العضوية إلى حالتها السابقة.',503);
+    }
     return NextResponse.json({success:true});
   } catch {
     return fail('حدث خطأ أثناء تحديث العضوية.',500);
