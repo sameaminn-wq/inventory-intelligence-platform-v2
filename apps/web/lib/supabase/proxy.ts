@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 function normalizePathname(pathname: string): string {
-  return pathname.length > 1 ? pathname.replace(/\\/+$/, '') : pathname;
+  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
 }
 
 function isPathOrChild(pathname: string, base: string): boolean {
