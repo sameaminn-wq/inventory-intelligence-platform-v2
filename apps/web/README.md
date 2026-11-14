@@ -30,11 +30,12 @@ Configure these in the relevant Vercel environment (Preview first):
 
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL.
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — publishable key; never expose a secret/service-role key in the browser.
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only Supabase service-role key used by the auth callback for invitation activation and by analysis failure cleanup in the private Storage bucket. Never prefix it with `NEXT_PUBLIC_` and never expose it to the client.
 - `ANALYSIS_API_ENABLED` — keep `false` until the intended Preview access and AI spend controls are verified.
 - `GEMINI_API_KEY` — server-only Gemini API key.
 - `GEMINI_MODEL` — exact supported Gemini model ID.
 
-Set the Supabase Auth Site URL and allowed redirect URLs to the exact app Preview URL. If email confirmation is enabled, the user must confirm their address before a session is established. Never commit real environment values.
+Set the Supabase Auth Site URL to the intended app URL and add the exact Preview callback URL (`https://<your-preview-host>/auth/callback`) to the allowed redirect URLs. If email confirmation is enabled, the user must confirm their address before a session is established. Never commit real environment values.
 
 ## Security and beta limits
 
