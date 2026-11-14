@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
   const savedReview = savedReviewData as { review_id: string; created_at: string } | null;
   if (saveError || !savedReview) {
     console.error('Atomic analysis review save failed:', saveError?.code);
+    if (saveError?.code === '23505') return fail('تم تسجيل مراجعة لهذه الجلسة بالفعل ولا يمكن إنشاء مراجعة مكررة.', 409);
     return fail('تعذر حفظ المراجعة وتحديث حالة الجلسة بشكل ذري.', 503);
   }
   return NextResponse.json({
