@@ -2,8 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 function normalizePathname(pathname: string): string {
-  // Keep route classification stable when Next.js supplies trailing slashes.
-  return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  return pathname.length > 1 ? pathname.replace(/\\/+$/, '') : pathname;
 }
 
 function isPathOrChild(pathname: string, base: string): boolean {
@@ -16,13 +15,9 @@ export async function updateSession(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !key) {
-    if (
-      pathname === '/login' ||
-      isPathOrChild(pathname, '/auth')
-    ) {
+    if (pathname === '/login' || pathname === '/signup' || isPathOrChild(pathname, '/auth')) {
       return NextResponse.next({ request });
     }
-
     const destination = request.nextUrl.clone();
     destination.pathname = '/login';
     destination.search = '';
@@ -32,9 +27,7 @@ export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
     cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
+      getAll() { return request.cookies.getAll(); },
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
@@ -47,8 +40,9 @@ export async function updateSession(request: NextRequest) {
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
   const isLogin = pathname === '/login';
+  const isSignup = pathname === '/signup';
   const isAuthRoute = isPathOrChild(pathname, '/auth');
-  const isPublic = isLogin || isAuthRoute;
+  const isPublic = isLogin || isSignup || isAuthRoute;
 
   if (error || !claims) {
     if (!isPublic) {
@@ -61,7 +55,7 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  if (isLogin) {
+  if (isLogin || isSignup) {
     const destination = request.nextUrl.clone();
     destination.pathname = '/';
     destination.search = '';
