@@ -118,7 +118,6 @@ export default function AnalysisPage() {
     }
     setBusy(true);
     setError('');
-    setSaved(false);
     try {
       const images = [];
       let totalBytes = 0;
@@ -164,7 +163,6 @@ export default function AnalysisPage() {
           <select id="analysis-store" value={selectedStoreId} onChange={(event) => {
             setSelectedStoreId(event.target.value);
             setAnalysis(null);
-            setSaved(false);
             window.sessionStorage.removeItem(ANALYSIS_KEY);
           }}>
             <option value="">اختر متجرًا</option>
