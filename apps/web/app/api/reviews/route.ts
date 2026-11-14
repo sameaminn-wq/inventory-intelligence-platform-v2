@@ -105,16 +105,16 @@ export async function POST(request: NextRequest) {
     observations: body.observations,
     note: 'هذه مراجعة بشرية موثقة؛ لا يتم تعديل رصيد المخزون تلقائياً.',
   };
-  const { data: review, error } = await ctx.supabase.from('analysis_reviews')
-    .insert({ analysis_session_id: session.id, reviewer_id: ctx.userId, review_json: reviewJson })
-    .select('id,created_at').single();
-  if (error || !review) return fail('تعذر حفظ المراجعة بشكل دائم.', 503);
-  const { error: statusError } = await ctx.supabase.from('analysis_sessions')
-    .update({ status: 'reviewed', reviewed_at: review.created_at })
-    .eq('id', session.id);
-  if (statusError) {
-    console.error('Analysis review status update failed:', statusError.code);
-    return fail('حُفظت المراجعة، لكن تعذر تحديث حالة الجلسة. حدّث الصفحة للتحقق.', 503);
+  const { data: savedReview, error: saveError } = await ctx.supabase.rpc('save_analysis_review', {
+    p_analysis_session_id: session.id,
+    p_review_json: reviewJson,
+  }).single();
+  if (saveError || !savedReview) {
+    console.error('Atomic analysis review save failed:', saveError?.code);
+    return fail('تعذر حفظ المراجعة وتحديث حالة الجلسة بشكل ذري.', 503);
   }
-  return NextResponse.json({ reviewId: review.id, createdAt: review.created_at }, { status: 201 });
+  return NextResponse.json({
+    reviewId: savedReview.review_id,
+    createdAt: savedReview.created_at,
+  }, { status: 201 });
 }
