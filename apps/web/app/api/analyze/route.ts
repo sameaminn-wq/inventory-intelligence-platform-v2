@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '../../../lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -141,6 +142,8 @@ export async function POST(request: NextRequest) {
     'Provided image IDs: ' + images.map((image) => image.imageId).join(', '),
   ].join('\n');
 
+  const imageAssets: Array<{ imageId: string; path: string }> = [];
+  const analysisAttemptId = randomUUID();
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -220,9 +223,8 @@ export async function POST(request: NextRequest) {
       return jsonError('تحتوي نتيجة التحليل على معرفات منتجات غير متسقة.', 502);
     }
 
-    const imageAssets: Array<{ imageId: string; path: string }> = [];
     for (const image of images) {
-      const path = `${input.storeId}/${userId}/${input.captureSessionId}/${image.imageId}.jpg`;
+      const path = `${input.storeId}/${userId}/${input.captureSessionId}/${analysisAttemptId}/${image.imageId}.jpg`;
       const bytes = new Uint8Array(Buffer.from(image.dataBase64, 'base64'));
       const { error: uploadError } = await supabase.storage
         .from('shelf-captures')
@@ -277,6 +279,10 @@ export async function POST(request: NextRequest) {
       note: 'AI estimates are suggestions only. Human verification is required before any inventory update.',
     });
   } catch (error) {
+    if (imageAssets.length > 0) {
+      const { error: cleanupError } = await supabase.storage.from('shelf-captures').remove(imageAssets.map((asset) => asset.path));
+      if (cleanupError) console.error('Shelf capture cleanup after exception failed:', cleanupError.name);
+    }
     if (error instanceof Error && error.name === 'TimeoutError') return jsonError('انتهت مهلة التحليل. جرّب عددًا أقل من الصور.', 504);
     return jsonError('حدث خطأ غير متوقع أثناء التحليل.', 502);
   }
