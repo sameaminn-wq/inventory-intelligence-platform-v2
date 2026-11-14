@@ -22,9 +22,11 @@ begin
      or p_review_json is null
      or jsonb_typeof(p_review_json) <> 'object'
      or p_review_json ->> 'schemaVersion' <> 'human-review-1.0'
-     or jsonb_typeof(p_review_json -> 'observations') <> 'array'
-     or jsonb_array_length(p_review_json -> 'observations') < 1
-     or jsonb_array_length(p_review_json -> 'observations') > 200 then
+     or case
+          when jsonb_typeof(p_review_json -> 'observations') = 'array'
+          then jsonb_array_length(p_review_json -> 'observations') not between 1 and 200
+          else true
+        end then
     raise exception 'Invalid analysis review payload' using errcode = '22023';
   end if;
 
