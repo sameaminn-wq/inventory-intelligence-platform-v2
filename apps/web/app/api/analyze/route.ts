@@ -229,6 +229,12 @@ export async function POST(request: NextRequest) {
         .upload(path, bytes, { contentType: image.mimeType, upsert: false });
       if (uploadError) {
         console.error('Shelf capture upload failed:', uploadError.name);
+        if (imageAssets.length > 0) {
+          const { error: cleanupError } = await supabase.storage
+            .from('shelf-captures')
+            .remove(imageAssets.map((asset) => asset.path));
+          if (cleanupError) console.error('Shelf capture cleanup failed:', cleanupError.name);
+        }
         return jsonError('تعذر حفظ إحدى صور الجلسة بأمان. لم نحفظ نتيجة التحليل كجلسة مكتملة.', 503);
       }
       imageAssets.push({ imageId: image.imageId, path });
@@ -251,6 +257,12 @@ export async function POST(request: NextRequest) {
       .single();
     if (persistError || !persistedSession) {
       console.error('Analysis persistence failed:', persistError?.code);
+      if (imageAssets.length > 0) {
+        const { error: cleanupError } = await supabase.storage
+          .from('shelf-captures')
+          .remove(imageAssets.map((asset) => asset.path));
+        if (cleanupError) console.error('Shelf capture cleanup failed:', cleanupError.name);
+      }
       return jsonError('تم التحليل لكن تعذر حفظ النتيجة بشكل دائم. لم نعرضها كأنها محفوظة.', 503);
     }
 
