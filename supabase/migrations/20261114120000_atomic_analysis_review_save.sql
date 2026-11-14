@@ -74,12 +74,13 @@ begin
   for v_item in select value from jsonb_array_elements(p_review_json -> 'observations')
   loop
     if jsonb_typeof(v_item) <> 'object'
-       or jsonb_typeof(v_item -> 'detectionId') <> 'string'
+       or jsonb_typeof(v_item -> 'detectionId') is distinct from 'string'
        or length(v_item ->> 'detectionId') = 0
        or (v_item ->> 'detectionId') = any(v_seen_ids)
        or not (v_item ? 'verifiedQuantity')
-       or jsonb_typeof(v_item -> 'verifiedQuantity') not in ('null', 'number')
-       or jsonb_typeof(v_item -> 'accepted') <> 'boolean'
+       or jsonb_typeof(v_item -> 'verifiedQuantity') is distinct from 'null'
+          and jsonb_typeof(v_item -> 'verifiedQuantity') is distinct from 'number'
+       or jsonb_typeof(v_item -> 'accepted') is distinct from 'boolean'
        or (v_item ? 'note' and (jsonb_typeof(v_item -> 'note') <> 'string' or length(v_item ->> 'note') > 500)) then
       raise exception 'Invalid review observation' using errcode = '22023';
     end if;
